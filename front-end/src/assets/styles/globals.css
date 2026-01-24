@@ -11,8 +11,11 @@
   --color-darkmint: #2B5869;
   --color-lightmint: #E5E7EB;
   --color-lightbg: #F9FAFB;
+  --color-darkbg: #F3F4F6;
   --color-darktext: #111618;
+  --color-graylighttext: #9CA3AF;
   --color-graytext: #4B5563;
+  --color-graytext2: #6B7280;
 
 
   --color-sidebar-ring: var(--sidebar-ring);

@@ -4,8 +4,8 @@ import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { FiMenu, FiX } from "react-icons/fi";
-import { RiGraduationCapFill } from "react-icons/ri";
 
+import LogoWithText from "../molecules/LogoWithText";
 import { Button } from "../atoms/button";
 const NAV_LINKS = [
   { label: "Explore", href: "/" },
@@ -22,13 +22,8 @@ const NavBar = () => {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
 
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 text-darkmint text-lg leading-7 font-extrabold">
-            <div className="bg-darkmint w-8 h-8 flex items-center justify-center rounded-[8px]">
-              <RiGraduationCapFill color="white" size={22} />
-            </div>
-            LMS Platform
-          </Link>
+          {/* Logo With text*/}
+          <LogoWithText />
 
           {/* Desktop Links */}
           <nav className="hidden md:flex items-center gap-2 me-auto ps-3">

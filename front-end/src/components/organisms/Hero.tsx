@@ -2,7 +2,7 @@ import Image from "next/image";
 import { FaRegCirclePlay } from "react-icons/fa6";
 import { IoMdTrendingUp } from "react-icons/io";
 import { Button } from "../atoms/button";
-import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "../atoms/avatar";
 export default function Hero() {
     return (
         <div className="Hero_section min-h-[calc(100vh-65px)] py-16 md:py-24 font-manrope" id="hero_section"
@@ -16,6 +16,7 @@ export default function Hero() {
                                 src={"/images/home/threestars.svg"}
                                 width={16}
                                 height={16}
+                                className="w-auto h-auto shrink-0"
                             />
                             <p className="font-bold text-xs md:text-sm leading-4">
                                 NEW: ADVANCED AI SYSTEMS COURSE
@@ -69,6 +70,7 @@ export default function Hero() {
                                 src="/images/home/hero.png"
                                 alt="hero section image"
                                 fill
+                                sizes="100%"
                                 className="opacity-80 mix-blend-overlay rounded-[24px] md:rounded-[32px] object-cover"
                             />
 

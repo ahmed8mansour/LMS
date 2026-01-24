@@ -3,6 +3,7 @@ import { Manrope } from "next/font/google";
 import "../assets/styles/globals.css";
 
 import NavBar from "../components/organisms/NavBar";
+import Footer from "@/components/organisms/Footer";
 
 
 
@@ -30,6 +31,7 @@ export default function RootLayout({
       >
         <NavBar />
         {children}
+        <Footer />
       </body>
     </html>
   );
