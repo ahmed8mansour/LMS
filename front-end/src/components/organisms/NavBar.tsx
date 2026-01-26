@@ -42,7 +42,7 @@ const NavBar = () => {
             <Button className="text-darktext" variant={"ghost"}>
               log in
             </Button>
-            <Button className="bg-darkmint shadow-lg w-30 h-9 ms-3 hover:opacity-90 hover:bg-darkmint">
+            <Button className="w-30 h-9 ms-3" variant={"darkmint"}>
               Join for Free
             </Button>
           </div>

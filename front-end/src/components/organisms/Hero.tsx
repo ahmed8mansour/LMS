@@ -30,7 +30,7 @@ export default function Hero() {
                             Join 50,000+ learners scaling their skills with industry-vetted curriculums and hands-on projects designed for professional growth.
                         </p>
                         <div className="pt-6 md:pt-8 flex flex-col sm:flex-row gap-4 sm:gap-0">
-                            <Button className="bg-darkmint shadow-lg w-full sm:w-40 lg:w-54 h-12 md:h-14.5 hover:opacity-90 hover:bg-darkmint font-bold text-[14px]  lg:text-[16px]">
+                            <Button className="w-full sm:w-40 lg:w-54 h-12 md:h-14.5 font-bold text-[14px] lg:text-[16px]" variant={"darkmint"}>
                                 Get Started for Free
                             </Button>
                             <Button

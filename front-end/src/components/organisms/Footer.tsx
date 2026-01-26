@@ -16,13 +16,13 @@ export default function Footer() {
                         <div className="flex">
                             <Link href={"/"}>
                                 <div className="w-10 h-10 ">
-                                    <FaThreads className="w-6 h-7 text-graylighttext" />
+                                    <FaThreads className="w-6 h-7 text-graylighttext hover:text-darkmint" />
                                 </div>
                             </Link>
 
                             <Link href={"/"}>
                                 <div className="w-10 h-10 ">
-                                    <BsGlobeAsiaAustralia className="w-6 h-7 text-graylighttext" />
+                                    <BsGlobeAsiaAustralia className="w-6 h-7 text-graylighttext hover:text-darkmint" />
                                 </div>
                             </Link>
 

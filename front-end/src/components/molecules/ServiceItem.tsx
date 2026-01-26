@@ -6,7 +6,7 @@ interface ServiceItemProps {
 
 const ServiceItem: React.FC<ServiceItemProps> = ({ icon, heading, body }) => {
     return (
-        <div className="flex flex-col items-center justify-center gap-4">
+        <div className="flex flex-col items-center gap-4">
             <div className="w-14 h-14 bg-darkmint/10 rounded-[16px] text-darkmint flex items-center justify-center">
                 {icon}
             </div>
