@@ -8,42 +8,9 @@ import {
 import { RadioGroup, RadioGroupItem } from "@/components/molecules/radio-group"
 import { FaLongArrowAltRight } from "react-icons/fa";
 import CourseCard from "../molecules/CourseCard";
+import Link from "next/link";
 // import { useState } from "react";
-
-const courses = [
-    {
-        ImageUrl: "/images/home/image.png",
-        Name: "React Mastery",
-        About: "Learn React from scratch with hands-on projects and expert guidance.",
-        Price: 49,
-        AvaterUrl: "",
-        Instructor: "Jane Doe",
-        Rate: 4.8,
-        Subscribers: 1520,
-        Tag: "Best Seller",
-    },
-    {
-        ImageUrl: "/images/home/image.png",
-        Name: "UI/UX Design Bootcamp",
-        About: "Master UI/UX fundamentals, wireframing, and user research techniques.",
-        Price: 59,
-        AvaterUrl: "",
-        Instructor: "John Smith",
-        Rate: 4.7,
-        Subscribers: 985,
-    },
-    {
-        ImageUrl: "/images/home/image.png",
-        Name: "Python for Data Science",
-        About: "A comprehensive course covering Python basics, Pandas, and machine learning.",
-        Price: 65,
-        AvaterUrl: "",
-        Instructor: "Emily Clark",
-        Rate: 4.9,
-        Subscribers: 2044,
-    },
-]
-
+import { courses } from "@/store/FakeData";
 export default function CoursesSection() {
     // const [selected, setSelected] = useState()
     // console.log(selected)
@@ -90,11 +57,13 @@ export default function CoursesSection() {
                 <div className="courses_area ">
                     <div className="flex items-center justify-between pt-12">
                         <h1 className="text-darktext text-xl/6 md:text-2xl/8 font-extrabold">Popular Courses</h1>
-                        <p className="text-darkmint text-xs/4 md:text-sm/5 font-bold flex items-center gap-x-2">View all courses <FaLongArrowAltRight size={16} /> </p>
+                        <Link href={"/courses"}>
+                            <p className="text-darkmint text-xs/4 md:text-sm/5 font-bold flex items-center gap-x-2">View all courses <FaLongArrowAltRight size={16} /> </p>
+                        </Link>
                     </div>
 
                     <div className="cards_parent pt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-                        {courses.map((course, idx) => (
+                        {courses.slice(0, 3).map((course, idx) => (
                             <CourseCard
                                 key={idx}
                                 ImageUrl={course.ImageUrl}
@@ -109,6 +78,7 @@ export default function CoursesSection() {
                             />
                         ))}
                     </div>
+
                 </div>
 
             </div>

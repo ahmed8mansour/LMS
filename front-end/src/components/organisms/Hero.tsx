@@ -2,6 +2,7 @@ import Image from "next/image";
 import { FaRegCirclePlay } from "react-icons/fa6";
 import { IoMdTrendingUp } from "react-icons/io";
 import { Button } from "../atoms/button";
+import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "../atoms/avatar";
 export default function Hero() {
     return (
@@ -30,9 +31,11 @@ export default function Hero() {
                             Join 50,000+ learners scaling their skills with industry-vetted curriculums and hands-on projects designed for professional growth.
                         </p>
                         <div className="pt-6 md:pt-8 flex flex-col sm:flex-row gap-4 sm:gap-0">
-                            <Button className="w-full sm:w-40 lg:w-54 h-12 md:h-14.5 font-bold text-[14px] lg:text-[16px]" variant={"darkmint"}>
-                                Get Started for Free
-                            </Button>
+                            <Link href={"/register"}>
+                                <Button className="w-full sm:w-40 lg:w-54 h-12 md:h-14.5 font-bold text-[14px] lg:text-[16px]" variant={"darkmint"}>
+                                    Get Started for Free
+                                </Button>
+                            </Link>
                             <Button
                                 className="text-darktext border-lightmint sm:w-40 w-full lg:w-54 h-12 md:h-14.5 font-bold text-[14px]  lg:text-[16px] sm:ms-4.5 flex items-center justify-center"
                                 variant={"outline"}

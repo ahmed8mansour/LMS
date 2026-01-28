@@ -43,7 +43,7 @@ export default function CourseCard({
                     className="object-cover w-full h-full transform transition-transform duration-300 group-hover:scale-105 rounded-2xl"
                 />
                 {Tag && (
-                    <div className="absolute z-10 w-20 h-6 py-1 px-2 bg-white rounded-[4px] text-darkmint left-3 top-3 uppercase font-extrabold text-[10px]">
+                    <div className="absolute z-10 w-fit h-6 py-1 px-2 bg-white rounded-[4px] text-darkmint left-3 top-3 uppercase font-extrabold text-[10px]">
                         {Tag}
                     </div>
                 )}
@@ -53,7 +53,7 @@ export default function CourseCard({
             <div className="space-y-4 py-5">
                 <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                        <h3 className="text-lg font-bold text-darktext ">{Name}</h3>
+                        <h3 className="text-lg font-bold text-darktext group-hover:text-darkmint ">{Name}</h3>
                         <p className="text-base font-bold text-darkmint">${Price}</p>
                     </div>
                     <p className="line-clamp-2 text-sm text-muted-foreground">{About}</p>

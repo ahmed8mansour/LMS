@@ -3,6 +3,7 @@ import { IoIosInfinite } from "react-icons/io";
 import { LiaCertificateSolid } from "react-icons/lia";
 import { FaPeopleRoof } from "react-icons/fa6";
 import { Button } from "../atoms/button";
+import Link from "next/link";
 
 
 
@@ -22,9 +23,11 @@ export default function ServicesSection() {
                         <p className="font-normal  text-md/6 md:text-lg/7 text-white mt-2">Start learning today and join thousands of successful graduates.</p>
                     </div>
                     <div>
-                        <Button className="bg-white text-darkmint hover:opacity-90 hover:bg-white shadow-lg w-full sm:w-40 lg:w-49 h-14 md:h-14.5 font-bold text-sm/5 lg:text-base/6">
-                            Join for Free Now
-                        </Button>
+                        <Link href={"/register"}>
+                            <Button className="bg-white text-darkmint hover:opacity-90 hover:bg-white shadow-lg w-full sm:w-40 lg:w-49 h-14 md:h-14.5 font-bold text-sm/5 lg:text-base/6">
+                                Join for Free Now
+                            </Button>
+                        </Link>
                     </div>
                 </div>
             </div>

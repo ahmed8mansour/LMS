@@ -39,12 +39,16 @@ const NavBar = () => {
           </nav>
 
           <div className="ms-auto hidden md:block">
-            <Button className="text-darktext" variant={"ghost"}>
-              log in
-            </Button>
-            <Button className="w-30 h-9 ms-3" variant={"darkmint"}>
-              Join for Free
-            </Button>
+            <Link href={"/login"}>
+              <Button className="text-darktext" variant={"ghost"}>
+                log in
+              </Button>
+            </Link>
+            <Link href={"/register"}>
+              <Button className="w-30 h-9 ms-3" variant={"darkmint"}>
+                Join for Free
+              </Button>
+            </Link>
           </div>
 
           {/* Mobile Menu Button */}
