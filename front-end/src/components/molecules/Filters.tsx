@@ -7,7 +7,7 @@ import { Field, FieldDescription, FieldGroup, FieldLabel, FieldLegend, FieldSet,
 import { Slider } from "@/components/atoms/slider"
 import { Label } from "@/components/atoms/label";
 import { RadioGroup, RadioGroupItem } from "@/components/molecules/radio-group";
-import { FaStar } from "react-icons/fa";
+import { IoMdStarOutline } from "react-icons/io";
 
 
 export function RadioGroupDemo() {
@@ -138,7 +138,7 @@ export default function Filters() {
                     </FieldLegend>
                     <div className="flex items-center gap-.5">
                         {[1, 2, 3, 4, 5].map((num) => (
-                            <FaStar
+                            <IoMdStarOutline 
                                 key={num}
                                 onClick={() => setSelected(num)}
                                 onMouseOver={() => setHover(num)}

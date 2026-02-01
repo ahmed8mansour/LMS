@@ -3,7 +3,8 @@ import { Button } from "../atoms/button";
 import { Github, ExternalLink } from "lucide-react";
 import Image from "next/image";
 import { Avatar, AvatarFallback, AvatarImage } from "../atoms/avatar";
-import { FaRegStar } from "react-icons/fa";
+import { IoMdStarOutline } from "react-icons/io";
+
 interface CourseCardProps {
     ImageUrl: string,
     Name: string,
@@ -66,7 +67,7 @@ export default function CourseCard({
                             <p className="text-xs font-semibold text-darktext ms-2">{Instructor}</p>
                         </div>
                         <div className="flex items-center gap-x-2">
-                            <div className="text-[#F59E0B] flex items-center gap-x-1"><FaRegStar />{Rate}</div>
+                            <div className="text-[#F59E0B] flex items-center gap-x-1"><IoMdStarOutline  />{Rate}</div>
                             <div className="text-muted-foreground">({Subscribers})</div>
                         </div>
                     </div>
