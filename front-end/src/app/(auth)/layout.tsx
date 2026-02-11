@@ -4,6 +4,7 @@ import LogoWithText from "@/components/molecules/LogoWithText";
 
 
 
+import { GoogleOAuthProvider, useGoogleLogin } from '@react-oauth/google';
 
 export const metadata: Metadata = {
     title: "Create Next App",
@@ -56,7 +57,9 @@ export default function AuthLayout({
                 <div className="md:hidden block">
                     <LogoWithText Text="LMS Portal" classNameT="" classNameI="bg-white" IconColor="text-darkmint" />
                 </div>
-                {children}
+                <GoogleOAuthProvider clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ''}>
+                    {children}
+                </GoogleOAuthProvider>
             </div>
         </main>
     );

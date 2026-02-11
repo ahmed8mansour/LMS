@@ -1,12 +1,25 @@
+'use client'
+
 import { Input } from "@/components/atoms/input"
 import { Label } from "@/components/atoms/label"
 import { Button } from "@/components/atoms/button"
 import { PasswordInput } from "@/components/atoms/password-input"
 import { FaArrowRight } from "react-icons/fa";
-import { BsGithub } from "react-icons/bs";
 import Link from "next/link";
 import { CiLock } from "react-icons/ci";
+import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
+import { BsGithub } from "react-icons/bs"
 export default function Login() {
+    const handleGoogleSuccess = (credentialResponse: any) => {
+        console.log('Google Login Success:', credentialResponse);
+        // Send token to your backend for verification
+        // const token = credentialResponse.credential;
+    };
+
+    const handleGoogleError = () => {
+        console.log('Google Login Failed');
+    };
+
     return (
         <div className="login_component flex items-center justify-center h-full">
             <div className="xl:w-85/100 2xl:2/3 w-full flex items-center justify-center ">

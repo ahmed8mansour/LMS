@@ -1,16 +1,69 @@
+'use client'
+
 import { Input } from "@/components/atoms/input"
 import { Label } from "@/components/atoms/label"
 import { Button } from "@/components/atoms/button"
 import { PasswordInput } from "@/components/atoms/password-input"
-import { FaArrowRight } from "react-icons/fa";
-import { BsGithub } from "react-icons/bs";
 import Link from "next/link";
 import { CiLock } from "react-icons/ci";
+import { GoogleOAuthProvider, useGoogleLogin } from '@react-oauth/google';
+import { BsGithub } from "react-icons/bs"
+
 export default function Register() {
+
+const login = useGoogleLogin({
+  flow: 'auth-code',
+  redirect_uri: 'http://localhost:3000', // ⚠️ مهم جداً! نفس القيمة في الباك اند
+  
+  onSuccess: async (codeResponse) => {
+    try {
+      console.log('Google code:', codeResponse.code);
+
+      const res = await fetch(
+        'http://localhost:8000/auth/google/user/login/',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            code: codeResponse.code,
+            role:'instructor'
+          }),
+        }
+      );
+
+      const data = await res.json();
+      
+      if (!res.ok) {
+        console.error('Backend error:', data);
+        throw new Error(data.error || 'Login failed');
+      }
+
+      console.log('Login successful:', data);
+      
+      // حفظ الـ tokens
+      localStorage.setItem('access_token', data.access);
+      localStorage.setItem('refresh_token', data.refresh);
+      
+      // Redirect أو تحديث الـ state
+      // window.location.href = '/dashboard';
+
+    } catch (error) {
+      console.error('Error:', error);
+    }
+  },
+
+  onError: (errorResponse) => {
+    console.error('Google OAuth error:', errorResponse);
+  },
+});
+
     return (
-        <div className="register_component flex items-center justify-center h-full">
-            <div className="xl:w-85/100 2xl:2/3  w-full flex items-center justify-center ">
-                <div className="form_header mb-8">
+        <GoogleOAuthProvider clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ''}>
+            <div className="register_component flex items-center justify-center h-full">
+                <div className="xl:w-85/100 2xl:2/3  w-full flex items-center justify-center ">
+                    <div className="form_header mb-8">
 
                     <h2 className="text-darktext font-extrabold text-3xl/7.5 mb-2">Create your account</h2>
                     <p className="font-normal text-base/6 text-graylighttext mb-7 2xl:min-w-[360px]">Join our learning community today</p>
@@ -58,6 +111,7 @@ export default function Register() {
                                     variant="outline"
                                     className="w-full h-11 border border-[#D5DEE1] flex items-center justify-center gap-2"
                                     type="button"
+                                    onClick={login}
                                 >
                                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="22px" height="22px">
                                         <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.1 2.38 29.95 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C14.65 13.92 18.88 9.5 24 9.5z" />
@@ -99,5 +153,7 @@ export default function Register() {
             </div>
 
         </div>
+        </GoogleOAuthProvider>
+
     )
 }
