@@ -97,7 +97,7 @@ class CustomUserManager(BaseUserManager):
         return self._create_user(email, password, **extra_fields)
 
     def create_superuser(self, email, password=None, **extra_fields): 
-        extra_fields['is_active'] = False
+        extra_fields['is_active'] = True
         extra_fields['is_staff'] = True
         extra_fields['is_superuser'] = True
         return self._create_user(email, password, **extra_fields)
@@ -105,6 +105,7 @@ class CustomUserManager(BaseUserManager):
 class CustomUser(AbstractBaseUser, PermissionsMixin):
     # fields from the abstract baseuser : (last login , password)
     # fields from the PermissionsMixin : (groups , permissions)
+    profile_picture = models.ImageField(upload_to='LMS/PFP/')
     username = models.CharField(max_length=255, unique=True)
     first_name = models.CharField(max_length=255, blank=True)
     last_name = models.CharField(max_length=255, blank=True)
@@ -129,3 +130,27 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return f'{self.username} & {self.role}'
+
+class StudentProfile(models.Model):
+    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='student_profile')
+    # Add any additional fields specific to students here
+
+    def __str__(self):
+        return f'Student Profile for {self.user.username}'
+    
+class InstructorProfile(models.Model):
+    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='instructor_profile')
+    title= models.CharField(max_length=255, blank=True)
+    about= models.CharField(max_length=255, blank=True)
+
+    def __str__(self):
+        return f'Instructor Profile for {self.user.username}'
+    
+
+class AdminProfile(models.Model):
+    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='admin_profile')
+    # Add any additional fields specific to Admin here
+
+    def __str__(self):
+        return f'Admin Profile for {self.user.username}'
+    

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import CustomUser , EmailOTP
+from .models import CustomUser , EmailOTP, StudentProfile, InstructorProfile, AdminProfile
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 import requests
@@ -10,12 +10,54 @@ from rest_framework import status
 from .utils import send_otp_email
 from django.forms.models import model_to_dict
 
+class StudentProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = StudentProfile
+        fields = ['id']
+
+
+class InstructorProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = InstructorProfile
+        fields = ['id', 'title', 'about']
+
+
+class AdminProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AdminProfile
+        fields = ['id']
+
+
 class UserDataSerializer(serializers.ModelSerializer):
+    profile = serializers.SerializerMethodField()
+    
     class Meta:
         model = CustomUser
         fields = ['id', 'email', 'username', 'first_name', 'last_name', 
-                'role', 'is_active', 'is_email_verified', 'date_joined' , 'can_change_password']
-        read_only_fields = fields  
+                'role', 'is_active', 'is_email_verified', 'date_joined' , 'can_change_password', 'profile']
+        read_only_fields = fields
+    
+    def get_profile(self, obj):
+        """Return the appropriate profile based on user role"""
+        if obj.role == 'student':
+            try:
+                profile = StudentProfile.objects.get(user=obj)
+                return StudentProfileSerializer(profile).data
+            except StudentProfile.DoesNotExist:
+                return None
+        elif obj.role == 'instructor':
+            try:
+                profile = InstructorProfile.objects.get(user=obj)
+                return InstructorProfileSerializer(profile).data
+            except InstructorProfile.DoesNotExist:
+                return None
+        elif obj.role == 'admin':
+            try:
+                profile = AdminProfile.objects.get(user=obj)
+                return AdminProfileSerializer(profile).data
+            except AdminProfile.DoesNotExist:
+                return None
+        return None  
 
 class CustomUserRegisterSendOTPSerializer(serializers.ModelSerializer):
     class Meta:
@@ -289,7 +331,7 @@ class UserForgetPasswordSetnewoneSerializer(serializers.Serializer):
         refresh = RefreshToken.for_user(user=user)
         user_data = UserDataSerializer(user).data
         data={
-            'message':'Set new Password is Successful',
+            'message':  'Set new Password is Successful',
             'user_data':user_data,
             'tokens':{
                 'refresh':str(refresh),
@@ -300,12 +342,36 @@ class UserForgetPasswordSetnewoneSerializer(serializers.Serializer):
         return data
 
 class UserProfileSerializer(serializers.ModelSerializer):
+    profile = serializers.SerializerMethodField()
+    
     class Meta:
         model = CustomUser
         exclude = ['groups', 'user_permissions' , 'is_staff'  , 'is_superuser' , 'password']
         extra_kwargs = {
             'password': {'write_only': True}
         }
+    
+    def get_profile(self, obj):
+        """Return the appropriate profile based on user role"""
+        if obj.role == 'student':
+            try:
+                profile = StudentProfile.objects.get(user=obj)
+                return StudentProfileSerializer(profile).data
+            except StudentProfile.DoesNotExist:
+                return None
+        elif obj.role == 'instructor':
+            try:
+                profile = InstructorProfile.objects.get(user=obj)
+                return InstructorProfileSerializer(profile).data
+            except InstructorProfile.DoesNotExist:
+                return None
+        elif obj.role == 'admin':
+            try:
+                profile = AdminProfile.objects.get(user=obj)
+                return AdminProfileSerializer(profile).data
+            except AdminProfile.DoesNotExist:
+                return None
+        return None
     
 class UserLoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
