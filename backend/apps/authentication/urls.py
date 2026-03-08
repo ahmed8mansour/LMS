@@ -1,7 +1,7 @@
 from django.urls import path
 from .views import (UserRegisterSendOTPView , 
                     UserLogoutView , UserProfileView
-                    , UserProfileUpdateView ,GoogleLoginAPIView , 
+                    , UserProfileUpdateView ,GoogleLoginAPIView , GoogleRegisterAPIView , 
                     UserLoginView , UserSetPasswordView , 
                     UserChangePasswordView , UserRegisterVerifyOTPView , 
                     UserResendOTPView , UserForgetPasswordSendOTPView,
@@ -9,10 +9,10 @@ from .views import (UserRegisterSendOTPView ,
                     UserForgetPasswordSetnewoneView,
                     GoogleSetPasswordSendOTPView,
                     GoogleSetPasswordVerifyOTPView,
-                    GoogleSetPasswordNewPasswordView
+                    GoogleSetPasswordNewPasswordView,
+                    TokenRefreshCookieView
                     )
-
-from rest_framework_simplejwt.views import TokenObtainPairView , TokenRefreshView 
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView 
 
 urlpatterns = [
 
@@ -36,13 +36,13 @@ urlpatterns = [
     
 
 
-    path('google/user/register/' , GoogleLoginAPIView.as_view() , name="google_register"),
+    path('google/user/register/' , GoogleRegisterAPIView.as_view() , name="google_register"),
     path('google/user/login/' , GoogleLoginAPIView.as_view() , name="google_login"),
     path('google/user/setpassword/sendOTP/' , GoogleSetPasswordSendOTPView.as_view() , name="google_setpassword_sendotp"),
     path('google/user/setpassword/verifyOTP/' , GoogleSetPasswordVerifyOTPView.as_view() , name="google_setpassword_verifyotp"),
     path('google/user/setpassword/SetPassword/' , GoogleSetPasswordNewPasswordView.as_view() , name="google_setpassword_setnew"),
 
 
-    path('token/refresh/' , TokenRefreshView.as_view() , name="token_refresh"),
+    path('token/refresh/' , TokenRefreshCookieView.as_view() , name="token_refresh"),
 
 ]

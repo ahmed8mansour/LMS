@@ -1,6 +1,6 @@
 export const courses = [
     {
-        ImageUrl: "/images/home/image.png",
+        ImageUrl: "/images/home/unnamed.png",
         Name: "React Mastery",
         About: "Learn React from scratch with hands-on projects and expert guidance.",
         Price: 49,
@@ -54,7 +54,7 @@ export const courses = [
         ]
     },
     {
-        ImageUrl: "/images/home/image.png",
+        ImageUrl: "/images/home/unnamed (1).png",
         Name: "UI/UX Design Bootcamp",
         About: "Master UI/UX fundamentals, wireframing, and user research techniques.",
         Price: 59,
@@ -108,7 +108,7 @@ export const courses = [
         ]
     },
     {
-        ImageUrl: "/images/home/image.png",
+        ImageUrl: "/images/home/Image.png",
         Name: "Python for Data Science",
         About: "A comprehensive course covering Python basics, Pandas, and machine learning.",
         Price: 65,
@@ -162,7 +162,7 @@ export const courses = [
         ]
     },
     {
-        ImageUrl: "/images/home/image.png",
+        ImageUrl: "/images/home/unnamed3.jpg",
         Name: "Fullstack Web Development",
         About: "Build modern websites and APIs using JavaScript, Node.js, and more.",
         Price: 75,
@@ -216,7 +216,7 @@ export const courses = [
         ]
     },
     {
-        ImageUrl: "/images/home/image.png",
+        ImageUrl: "/images/home/unnamed4.png",
         Name: "Digital Marketing Essentials",
         About: "Discover SEO, email marketing, and social media strategies for growth.",
         Price: 42,
@@ -437,7 +437,7 @@ export const courses = [
         About: "Everything you need to know to launch and grow your startup.",
         Price: 58,
         AvaterUrl: "",
-        Instructor: "Angela White",
+        Instructor: "Angela Smith",
         Rate: 4.6,
         Subscribers: 890,
         Tag: "Business",

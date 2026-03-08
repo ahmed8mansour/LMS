@@ -19,7 +19,7 @@ environ.Env.read_env(os.path.join(BASE_DIR, ".env"))
 SECRET_KEY = env('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = env('DEBUG')
 
 ALLOWED_HOSTS = []
 
@@ -53,8 +53,10 @@ INSTALLED_APPS = [
     'corsheaders',
 
     # Your apps
-    'apps.authentication'
+    'apps.authentication',
+    'apps.course'
 ]
+
 
 SITE_ID = 1 
 
@@ -71,9 +73,23 @@ MIDDLEWARE = [
 ]
 
 # CORS Settings
-CORS_ALLOWED_ORIGINS = []
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+]
 CORS_ALLOW_ALL_ORIGINS = True
-CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_CREDENTIALS = True  # Required for HttpOnly cookies
+
+# ==========================
+# Cookie Settings
+# ==========================
+
+# settings.py (ready fro both > developent and production)
+JWT_COOKIE_SETTINGS = {
+    'samesite': 'Lax', # CSRF protection - adjust as needed (None, Lax, Strict)
+    'secure': not DEBUG, # dev only - set to True in production
+    'httponly': True,
+    'path': '/',
+}
 
 # Custom User Model
 AUTH_USER_MODEL = "authentication.CustomUser"
@@ -81,9 +97,20 @@ AUTH_USER_MODEL = "authentication.CustomUser"
 # DRF Settings
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'apps.authentication.utils.CookieJWTAuthentication',
     ),
 }
+
+
+# ==========================
+# Etxra Configuration
+# ==========================
+
+# -- هادول روابط مشهورة يعني ما بتاخدهم مقابل تسجيل في خدمة او ما شابه ذلك 
+PASSWORD_RESET_TOKEN_EXPIRY_MINUTES = 10
+OTP_EXPIRY_MINUTES = 10
+GET_GOOGLE_ACCESS_TOKEN_URL = "https://oauth2.googleapis.com/token"
+GET_GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo"
 
 # ==========================
 # Cloudinary Configuration
@@ -143,9 +170,13 @@ SOCIALACCOUNT_PROVIDERS = {
     }
 }
 
+GOOGLE_OAUTH_REDIRECT_URI =  env('GOOGLE_OAUTH_REDIRECT_URI'),
+
 # ==========================
 # JWT Settings
 # ==========================
+# Tokens are stored in HttpOnly cookies instead of being returned in the response body
+# This provides better security against XSS attacks
 from datetime import timedelta
 
 SIMPLE_JWT = {
@@ -180,11 +211,14 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': env('POSTGRES_DB'),
+        'USER': env('POSTGRES_USER'),
+        'PASSWORD':env('POSTGRES_PASSWORD') ,
+        'HOST': env('POSTGRES_HOST'),
+        'PORT': env('POSTGRES_PORT'),
     }
 }
-
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
     {

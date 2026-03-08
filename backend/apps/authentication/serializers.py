@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import CustomUser , EmailOTP, StudentProfile, InstructorProfile, AdminProfile
+from .models import CustomUser  , PasswordResetToken, EmailOTP, StudentProfile, InstructorProfile, AdminProfile
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 import requests
@@ -9,35 +9,39 @@ from django.contrib.auth import authenticate
 from rest_framework import status
 from .utils import send_otp_email
 from django.forms.models import model_to_dict
+from.utils import exchange_code_for_user_info
+
 
 class StudentProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = StudentProfile
-        fields = ['id']
+        exclude=['id' ,'user']
 
 
 class InstructorProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = InstructorProfile
-        fields = ['id', 'title', 'about']
+        exclude=['id' ,'user']
 
 
 class AdminProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = AdminProfile
-        fields = ['id']
+        exclude=['id' ,'user']
 
 
 class UserDataSerializer(serializers.ModelSerializer):
-    profile = serializers.SerializerMethodField()
+    specific_data = serializers.SerializerMethodField()
+    
     
     class Meta:
         model = CustomUser
-        fields = ['id', 'email', 'username', 'first_name', 'last_name', 
-                'role', 'is_active', 'is_email_verified', 'date_joined' , 'can_change_password', 'profile']
-        read_only_fields = fields
+        exclude = ['groups', 'user_permissions' , 'is_staff'  , 'is_superuser' , 'password']
+        extra_kwargs = {
+            'password': {'write_only': True}
+        }
     
-    def get_profile(self, obj):
+    def get_specific_data(self, obj):
         """Return the appropriate profile based on user role"""
         if obj.role == 'student':
             try:
@@ -62,7 +66,7 @@ class UserDataSerializer(serializers.ModelSerializer):
 class CustomUserRegisterSendOTPSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser
-        exclude = ['groups', 'user_permissions','is_staff' , 'is_superuser']
+        exclude = ['groups', 'user_permissions','is_staff' , 'is_superuser','profile_picture']
         extra_kwargs = {
             'password': {'write_only': True}
         }
@@ -203,14 +207,9 @@ class UserRegisterVerifyOTPSerializer(serializers.Serializer):
         otp.save()
         user_data = UserDataSerializer(user).data
 
-        refresh = RefreshToken.for_user(user=user)
         return {
             'message':'Email verified successfully! You can now login',
             'user_data':user_data,
-            'tokens':{
-                'refresh':str(refresh),
-                'access':str(refresh.access_token),
-            }
         }
 
 
@@ -225,6 +224,7 @@ class UserForgetPasswordSendOTPSerializer(serializers.Serializer):
         email = data.get('email')
         try:
             user = CustomUser.objects.get(email=email)
+
         except CustomUser.DoesNotExist:
             raise serializers.ValidationError({
                 'error':'User Is Not Found'
@@ -234,15 +234,27 @@ class UserForgetPasswordSendOTPSerializer(serializers.Serializer):
             raise serializers.ValidationError({
                 'error':"Sign in with google then set a password"
             })
+        
+        
+        # last_otp = EmailOTP.objects.filter(
+        #     user=user, 
+        #     purpose='forget_password'
+        # ).order_by('-created_at').first()
 
-        return super().validate(data)
+        # if last_otp and last_otp.is_valid():
+        #     raise serializers.ValidationError({
+        #         'error': "Your OTP hasn't expired, please use it"
+        #     }) 
+
+        self.user = user
+        return data
     
     
     def save(self, **kwargs):
-        email = self.validated_data['email']
-        user = CustomUser.objects.get(email=email)
-        otp_code = EmailOTP.create_otp(user=user , purpose='forget_password')
-        send_otp_email(user=user , otp_code=otp_code.code , purpose='forget_password')
+        user = self.user
+        otp_code = EmailOTP.create_otp(user=user, purpose='forget_password')
+        send_otp_email(user=user, otp_code=otp_code.code, purpose='forget_password')
+
         return {
             'message':'Please Check ur Email , and Fill the OTP to change ur password',
             'next_step':"fill the otp then add new password"
@@ -275,104 +287,88 @@ class UserForgetPasswordVerifyOTPSerializer(serializers.Serializer):
                 'error':'OTP CODE has expired. Please request a new one.'
             })
         data['user'] = user
+        data['otp'] = otp
         return data
     
     def save(self, **kwargs):
         user = self.validated_data['user']
-        data= UserDataSerializer(user).data
-        user.can_change_password = True
-        data = UserDataSerializer(user).data
+        otp = self.validated_data['otp']
+
+        otp.is_used = True
+        otp.save()
+
+        reset_token = PasswordResetToken.create_token(user=user)
         user.save()
 
-        print(data)
+        # Store token in context for view to set as cookie
+        self.context['reset_token'] = reset_token
+        self.context['user'] = user
 
         return {
             'message': 'OTP verified successfully. You can now reset your password.',
-            'email': user.email,
-            'can_change_password': True, # مهم جدا 
-            # ممكن يكون الايميل verified وهادي لااا 
-            
+            'next_step': 'set_new_password'
         }
 
 
 class UserForgetPasswordSetnewoneSerializer(serializers.Serializer):
-    email= serializers.EmailField()
     new_password = serializers.CharField(write_only=True, style={'input_type': 'password'})
 
     def validate(self, data):
-        email = data.get('email')
         new_password = data.get('new_password')
-
+        
+        # Get reset token from context (set by view from cookies)
+        reset_token_str = self.context.get('reset_token')
+        
+        if not reset_token_str:
+            raise serializers.ValidationError({
+                'error': 'Password reset token is missing. Please request a new OTP.'
+            })
+        
         try:
-            user = CustomUser.objects.get(email = email)
-        except CustomUser.DoesNotExist:
+            token_obj = PasswordResetToken.objects.select_related('user').get(
+                token=reset_token_str,
+                is_used=False
+            )
+        except PasswordResetToken.DoesNotExist:
             raise serializers.ValidationError({
-                'error':'User is not Found'
+                'error': 'Invalid or expired reset token. Please request a new one.'
             })
-        if not user.can_change_password:
+        
+        # Check if expired
+        if not token_obj.is_valid():
             raise serializers.ValidationError({
-                'error':'Please use The sent OTP to verify your account'
+                'error': 'Reset token has expired. Please request a new one.'
             })
-
-        data['user']=user
-        data['new_password'] = new_password
+        
+        user = token_obj.user
+        
+        data['user'] = user
+        data['token_obj'] = token_obj
         return data
     
     def save(self, **kwargs):
-        user = self._validated_data['user']
-        new_password = self._validated_data['new_password']
+        user = self.validated_data['user']
+        token_obj = self.validated_data['token_obj']
+        new_password = self.validated_data['new_password']
 
         user.set_password(new_password)
-        user.can_change_password = False
-        user.is_active = True
-        user.is_email_verified = True
         user.save()
-
-        refresh = RefreshToken.for_user(user=user)
-        user_data = UserDataSerializer(user).data
-        data={
-            'message':  'Set new Password is Successful',
-            'user_data':user_data,
-            'tokens':{
-                'refresh':str(refresh),
-                'access':str(refresh.access_token),
-            }
-        }
         
-        return data
+        # Mark token as used
+        token_obj.mark_as_used()
+        
+        PasswordResetToken.objects.filter(
+            user=user,
+            is_used=False
+        ).update(is_used=True)
+        user_data = UserDataSerializer(user).data
 
-class UserProfileSerializer(serializers.ModelSerializer):
-    profile = serializers.SerializerMethodField()
-    
-    class Meta:
-        model = CustomUser
-        exclude = ['groups', 'user_permissions' , 'is_staff'  , 'is_superuser' , 'password']
-        extra_kwargs = {
-            'password': {'write_only': True}
+        return {
+            'message': 'Welcome! Password reset successfully!',
+            'user_data': user_data
         }
-    
-    def get_profile(self, obj):
-        """Return the appropriate profile based on user role"""
-        if obj.role == 'student':
-            try:
-                profile = StudentProfile.objects.get(user=obj)
-                return StudentProfileSerializer(profile).data
-            except StudentProfile.DoesNotExist:
-                return None
-        elif obj.role == 'instructor':
-            try:
-                profile = InstructorProfile.objects.get(user=obj)
-                return InstructorProfileSerializer(profile).data
-            except InstructorProfile.DoesNotExist:
-                return None
-        elif obj.role == 'admin':
-            try:
-                profile = AdminProfile.objects.get(user=obj)
-                return AdminProfileSerializer(profile).data
-            except AdminProfile.DoesNotExist:
-                return None
-        return None
-    
+
+
 class UserLoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True, style={'input_type': 'password'})
@@ -387,9 +383,6 @@ class UserLoginSerializer(serializers.Serializer):
                 raise serializers.ValidationError({
                     'error': 'Account is disabled. Please verify your email.',
                 })
-            # اعمل هنا functionality 
-            # 1- يبعت otp
-            # 2- verify
         except CustomUser.DoesNotExist:
             raise serializers.ValidationError({
                 'error': 'Invalid email or password'
@@ -399,7 +392,7 @@ class UserLoginSerializer(serializers.Serializer):
             socialaccount = SocialAccount.objects.filter(user=user).first()
             provider = socialaccount.provider if socialaccount else "social login"
             raise serializers.ValidationError({
-                'error': f'This account was created using {provider}.',
+                'error': f'This account was created using {provider} ,Please sign in with {provider} now, then set a password.',
                 'suggestion': f'Please sign in with {provider} now, then set a password.',
                 'login_method': provider,
                 'oauth_required': True
@@ -419,16 +412,11 @@ class UserLoginSerializer(serializers.Serializer):
 
     def create(self, validated_data):
         user = validated_data['user']
-        refresh = RefreshToken.for_user(user)
         user_data = UserDataSerializer(user).data
 
         return {
-            'message': 'login successful',
+            'message': 'Login successful',
             'user_data': user_data,
-            'tokens': {
-                'refresh': str(refresh),
-                'access': str(refresh.access_token)
-            }
         }
 
 
@@ -496,177 +484,139 @@ class UserChangePasswordSerializer(serializers.Serializer):
         }
 
 
-class GoogleOAuthSerializer(serializers.Serializer):
-    """
-    Serializer للتعامل مع Google OAuth
-    يستقبل الـ code والـ role ويرجع user data + tokens
-    """
+
+class GoogleAuthBaseSerializer(serializers.Serializer):
     code = serializers.CharField(required=True, write_only=True)
-    role = serializers.ChoiceField(
-        choices=['student', 'instructor', 'admin'],
-        required=True,
-        write_only=True
-    )
-    
+
     def validate_code(self, value):
-        if not value:
-            raise serializers.ValidationError("Authorization code is required")
+        if not value.strip():
+            raise serializers.ValidationError("Authorization code is required.")
         return value
-    
-    def validate_role(self, value):
-        """التحقق من صحة الـ role"""
-        valid_roles = ['student', 'instructor', 'admin']
-        if value not in valid_roles:
-            raise serializers.ValidationError(
-                f"Invalid role. Must be one of: {', '.join(valid_roles)}"
-            )
-        return value
-    
+
+
+
+class GoogleLoginSerializer(GoogleAuthBaseSerializer):
+    """
+    1- give the auth code 
+    2- exchange the codes and get the data (using the helper function)
+    3- return the {message , user_data } + set_jwt_cookies
+    """
+
     def create(self, validated_data):
         code = validated_data.get('code')
-        role = validated_data.get('role')
-        # 1- 
-        # عملية تبادل الاكواد (اعطيني كود من الفرونت وبعطيك اكسس توكن بتوصل منه للبيانات )
-        token_url = "https://oauth2.googleapis.com/token"
-        token_data = {
-            "code": code,
-            "client_id": settings.SOCIALACCOUNT_PROVIDERS["google"]["APP"]["client_id"],
-            "client_secret": settings.SOCIALACCOUNT_PROVIDERS["google"]["APP"]["secret"],
-            "redirect_uri": "http://localhost:3000",
-            "grant_type": "authorization_code",
-        }
-        
-        try:
-            token_response = requests.post(token_url, data=token_data, timeout=10)
-            token_json = token_response.json()
-            
-            if "error" in token_json:
-                raise serializers.ValidationError({
-                    "google_error": token_json.get("error_description", "Failed to exchange code")
-                })
-            
-            access_token = token_json.get("access_token")
-            # 2- الخطوة الثانية 
-            # ابعت الاكسس توكن لجوجل واحصل على بيانات المستخدم بعدها انت حر سجله يوزر جديد اعمل الي بدك اياه 
-            user_info_url = "https://www.googleapis.com/oauth2/v2/userinfo"
-            headers = {"Authorization": f"Bearer {access_token}"}
-            user_info_response = requests.get(user_info_url, headers=headers, timeout=10)
-            user_info = user_info_response.json()
-            
-            if "error" in user_info:
-                raise serializers.ValidationError({
-                    "google_error": "Failed to get user info from Google"
-                })
-            #  استخراج البيانات من Google
-            email = user_info.get("email")
-            google_id = user_info.get("id")
-            given_name = user_info.get("given_name", "")
-            family_name = user_info.get("family_name", "")
-            picture = user_info.get("picture", "")
-            
-            if not email:
-                raise serializers.ValidationError({
-                    "email": "Email not provided by Google"
-                })
-            
-            #  البحث عن المستخدم أو إنشاء واحد جديد
-            user = None
-            created = False
-            
-            try:
-                # المستخدم موجود - Login
-                user = CustomUser.objects.get(email=email)
-                
-                # ربط الحساب بـ Google إذا لم يكن مربوط
-                social_account, _ = SocialAccount.objects.get_or_create(
-                    user=user,
-                    provider="google",
-                    defaults={
-                        "uid": google_id,
-                        "extra_data": user_info,
-                    }
-                )
-                
-            except CustomUser.DoesNotExist:
-                # المستخدم غير موجود - Register
-                username = email.split("@")[0]
-                
-                # التأكد من عدم تكرار الـ username
-                base_username = username
-                counter = 1
-                while CustomUser.objects.filter(username=username).exists():
-                    username = f"{base_username}{counter}"
-                    counter += 1
-                
-                #  استخدام CustomUserManager بناءً على الـ role
-                user_data = {
-                    'username': username,
-                    'email': email,
-                    'first_name': given_name,
-                    'last_name': family_name,
-                    'role': role,
-                    'is_active': True,
-                    'is_email_verified': True,
-                }
-                
-                # استخدام الـ Manager المناسب
-                if role == 'student':
-                    user = CustomUser.objects.create_user(**user_data)
-                elif role == 'instructor':
-                    user = CustomUser.objects.create_instructor(**user_data)
-                elif role == 'admin':
-                    user = CustomUser.objects.create_superuser(**user_data)
-                else:
-                    raise serializers.ValidationError({
-                        'role': f'Invalid role: {role}'
-                    })
-                
-                # عدم تعيين password لأنه يستخدم Google OAuth
-                user.set_unusable_password()
-                user.is_active = True
-                user.save()
-                created = True
-                
-                # ربط الحساب بـ Google
-                SocialAccount.objects.create(
-                    user=user,
-                    provider="google",
-                    uid=google_id,
-                    extra_data=user_info,
-                )
-            
-            #  توليد JWT tokens
-            refresh = RefreshToken.for_user(user)
-            
-            # حفظ البيانات للـ to_representation
-            self.context['user'] = user
-            self.context['refresh'] = refresh
-            self.context['created'] = created
-            self.context['picture'] = picture
-            
-            return user
-            
-        except requests.RequestException as e:
+        user_info = exchange_code_for_user_info(code)
+        email = user_info['email']
+        google_id = user_info['id']
+
+        try : 
+            user = CustomUser.objects.get(email =email)
+        except CustomUser.DoesNotExist:
             raise serializers.ValidationError({
-                "network_error": f"Failed to communicate with Google: {str(e)}"
+                'error':'No account found with this email. Please register first.'
             })
+
+        SocialAccount.objects.get_or_create(
+            user=user,
+            provider="google",
+            defaults={"uid": google_id, "extra_data": user_info},
+        )
+
+        self.context['user'] = user
+
+        return user
     
     def to_representation(self, instance):
 
         user = self.context['user']
-        refresh = self.context['refresh']
-        created = self.context.get('created', False)
-        picture = self.context.get('picture', '')
         user_data = UserDataSerializer(user).data
-        user_data['profile_picture'] = picture
         
         response_data = {
-            'message': 'Account created via Google successfully' if created else 'Google login successful',
+            'message':'Google login successful',
             'user_data': user_data,
-            'tokens': {
-                'refresh': str(refresh),
-                'access': str(refresh.access_token),
-            }
+        }
+        
+        return response_data
+
+
+class GoogleRegisterSerializer(GoogleAuthBaseSerializer):
+    """
+    1- give the auth code 
+    2- exchange the codes and get the data (using the helper function)
+    3- return the {message , user_data } + set_jwt_cookies
+    """
+    role = serializers.ChoiceField(
+        choices=['student', 'instructor'],
+        required=True,
+        write_only=True
+    )
+
+    def create(self, validated_data):
+        code = validated_data.get('code')
+        role = validated_data.get('role')
+        user_info = exchange_code_for_user_info(code)
+
+        email      = user_info["email"]
+        google_id  = user_info.get("id")
+        first_name = user_info.get("given_name", "")
+        last_name= user_info.get("family_name", "")
+        picture    = user_info.get("picture", "")
+
+        if CustomUser.objects.filter(email=email).exists():
+            raise serializers.ValidationError(
+                {"error": "An account with this email already exists. Please login instead."}
+            )     
+        
+        # create unique username 
+        base_username = email.split("@")[0]
+        username = base_username
+        counter = 1
+
+        while CustomUser.objects.filter(username=username).exists():
+            username = f"{base_username}{counter}"
+            counter += 1
+        
+
+
+        user_data = {
+            "username":          username,
+            "email":             email,
+            "first_name":        first_name,
+            "last_name":         last_name,
+            "profile_picture":   picture,
+            "role":              role,
+            "is_active":         True,
+            "is_email_verified": True,
+        }
+            
+
+        if role == "student":
+            user = CustomUser.objects.create_user(**user_data)
+        else:  # instructor
+            user = CustomUser.objects.create_instructor(**user_data)
+
+        user.set_unusable_password()
+        user.save()
+
+        SocialAccount.objects.create(
+            user=user,
+            provider="google",
+            uid=google_id,
+            extra_data=user_info,
+        )
+
+        self.context["user"] = user
+
+        return user
+            
+    
+    def to_representation(self, instance):
+
+        user = self.context['user']
+        user_data = UserDataSerializer(user).data
+        
+        response_data = {
+            'message': 'Account created via Google successfully',
+            'user_data': user_data,
         }
         
         return response_data
@@ -814,14 +764,9 @@ class GoogleSetPasswordNewPasswordSerializer(serializers.Serializer):
         user.can_change_password = False
         user.save()
 
-        refresh = RefreshToken.for_user(user=user)
         user_data = UserDataSerializer(user).data
         
         return {
             'message': 'Password set successfully! You can now use email/password login.',
             'user_data': user_data,
-            'tokens': {
-                'refresh': str(refresh),
-                'access': str(refresh.access_token),
-            }
         }

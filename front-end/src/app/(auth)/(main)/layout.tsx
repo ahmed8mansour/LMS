@@ -2,8 +2,6 @@ import type { Metadata } from "next";
 import { BsShieldCheck } from "react-icons/bs";
 import LogoWithText from "@/components/molecules/LogoWithText";
 
-
-
 import { GoogleOAuthProvider, useGoogleLogin } from '@react-oauth/google';
 
 export const metadata: Metadata = {

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import CustomUser,EmailOTP,StudentProfile,InstructorProfile,AdminProfile
+from .models import CustomUser,EmailOTP,StudentProfile,InstructorProfile,AdminProfile , PasswordResetToken
 # Register your models here.
 
 admin.site.register(CustomUser)
@@ -7,3 +7,4 @@ admin.site.register(EmailOTP)
 admin.site.register(StudentProfile)
 admin.site.register(InstructorProfile)
 admin.site.register(AdminProfile)
+admin.site.register(PasswordResetToken)

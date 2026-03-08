@@ -7,6 +7,8 @@ import { FiMenu, FiX } from "react-icons/fi";
 
 import LogoWithText from "../molecules/LogoWithText";
 import { Button } from "../atoms/button";
+import { UserAvater } from "@/featuers/auth";
+
 const NAV_LINKS = [
   { label: "Explore", href: "/" },
   { label: "Pricing", href: "#projects" },
@@ -16,7 +18,6 @@ const NAV_LINKS = [
 
 const NavBar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-
   return (
     <header className="sticky top-0 z-50 border-b backdrop-blur font-manrope">
       <div className="container mx-auto px-4">
@@ -38,17 +39,8 @@ const NavBar = () => {
             ))}
           </nav>
 
-          <div className="ms-auto hidden md:block">
-            <Link href={"/login"}>
-              <Button className="text-darktext" variant={"ghost"}>
-                log in
-              </Button>
-            </Link>
-            <Link href={"/register"}>
-              <Button className="w-30 h-9 ms-3" variant={"darkmint"}>
-                Join for Free
-              </Button>
-            </Link>
+          <div className="ms-auto hidden md:flex items-center">
+            <UserAvater />
           </div>
 
           {/* Mobile Menu Button */}
@@ -80,12 +72,7 @@ const NavBar = () => {
           </nav>
 
           <div className="ms-auto pt-7">
-            <Button className="text-darktext" variant={"ghost"}>
-              log in
-            </Button>
-            <Button className="bg-darkmint shadow w-30 h-9 ms-3 hover:opacity-90 hover:bg-darkmint">
-              Join for Free
-            </Button>
+            <UserAvater />
           </div>
 
         </div>

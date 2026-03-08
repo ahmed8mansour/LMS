@@ -19,7 +19,7 @@ import { RiArticleLine } from "react-icons/ri";
 import { FaTv } from "react-icons/fa6";
 import { LiaCertificateSolid } from "react-icons/lia";
 
-export default function page() {
+export default function page(){
     const goals = [ "Design globally distributed database clusters", "Implement advanced caching strategies using Redis", "Master horizontal vs vertical scaling trade-offs", "Architect event-driven microservices with Kafka", "Ensure 99.99% availability in production", "Optimizing SQL queries for multi-tenant SaaS" ]
     
     const Sections = [
@@ -117,7 +117,7 @@ export default function page() {
                                 <ul className="text-body list-inside space-y-2">
                                     {goals.map((goal, index) => (
                                         <li className="flex items-start gap-2 text-xs sm:text-sm/5 font-medium" key={index + 1}>
-                                            <FaRegCheckCircle className="w-4 h-4 text-darkmint flex-shrink-0 mt-0.5" />
+                                            <FaRegCheckCircle className="w-4 h-4 text-darkmint shrink-0 mt-0.5" />
                                             <span>{goal}</span>
                                         </li>
                                     ))}

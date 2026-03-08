@@ -5,7 +5,92 @@ from django.utils import timezone
 from datetime import timedelta
 import random
 import string
+import secrets
 
+
+# models.py
+
+
+
+class PasswordResetToken(models.Model):
+    user = models.ForeignKey(
+        'CustomUser',
+        on_delete=models.CASCADE,
+        related_name='password_reset_tokens'
+    )
+    token = models.CharField(
+        max_length=64,
+        unique=True,
+        db_index=True  # ✅ للبحث السريع
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    is_used = models.BooleanField(default=False)
+    used_at = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Password Reset Token'
+        verbose_name_plural = 'Password Reset Tokens'
+    
+    def __str__(self):
+        status = 'Used' if self.is_used else ('Expired' if self.is_expired() else 'Active')
+        return f"{self.user.email} - {self.token[:8]}... ({status})"
+    
+    def save(self, *args, **kwargs):
+        """Auto-generate token and expiry"""
+        if not self.token:
+            self.token = secrets.token_urlsafe(32)  
+        
+        if not self.expires_at:
+            self.expires_at = timezone.now() + timedelta(minutes=settings.PASSWORD_RESET_TOKEN_EXPIRY_MINUTES)
+        
+        super().save(*args, **kwargs)
+    
+    def is_expired(self):
+        return timezone.now() > self.expires_at
+    
+    def is_valid(self):
+        """Check if token is valid (not used, not expired)"""
+        if self.is_used:
+            return False
+        if self.is_expired():
+            return False
+        return True
+    
+    def mark_as_used(self):
+        """Mark token as used"""
+        self.is_used = True
+        self.used_at = timezone.now()
+        self.save(update_fields=['is_used', 'used_at'])
+    
+    @classmethod
+    def create_token(cls, user):
+        """
+        Create a new reset token and invalidate old ones
+        """
+        # ✅ Invalidate all old tokens for this user
+        cls.objects.filter(
+            user=user,
+            is_used=False
+        ).update(is_used=True, used_at=timezone.now())
+        
+        # ✅ Create new token
+        token = cls.objects.create(user=user)
+    
+        
+        return token
+    
+    @classmethod
+    def cleanup_expired(cls):
+        """
+        Delete expired tokens (run as Celery task or cron)
+        """
+        threshold = timezone.now() - timedelta(days=7)
+        deleted_count, _ = cls.objects.filter(
+            created_at__lt=threshold
+        ).delete()
+        return deleted_count
 
 
 class EmailOTP(models.Model):
@@ -40,7 +125,7 @@ class EmailOTP(models.Model):
     
     def save(self, *args, **kwargs):
         if not self.expires_at:
-            self.expires_at = timezone.now() + timedelta(minutes=10)
+            self.expires_at = timezone.now() + timedelta(minutes=settings.OTP_EXPIRY_MINUTES)
         super().save(*args, **kwargs)
     
     @classmethod
@@ -85,19 +170,19 @@ class CustomUserManager(BaseUserManager):
         return user
 
     def create_user(self, email, password=None, **extra_fields):
-        extra_fields['is_active'] = False
+        extra_fields.setdefault('is_active', False)
         extra_fields['is_staff'] = False
         extra_fields['is_superuser'] = False
         return self._create_user(email, password, **extra_fields)
 
     def create_instructor(self, email, password=None, **extra_fields):
-        extra_fields['is_active'] = False
+        extra_fields.setdefault('is_active', False)
         extra_fields['is_staff'] = True
         extra_fields['is_superuser'] = False
         return self._create_user(email, password, **extra_fields)
 
     def create_superuser(self, email, password=None, **extra_fields): 
-        extra_fields['is_active'] = True
+        extra_fields.setdefault('is_active', True)
         extra_fields['is_staff'] = True
         extra_fields['is_superuser'] = True
         return self._create_user(email, password, **extra_fields)
@@ -122,7 +207,6 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     is_email_verified = models.BooleanField(default=False)
     date_joined = models.DateTimeField(auto_now_add=True)
 
-    can_change_password = models.BooleanField(default=False)
     objects = CustomUserManager()
 
     USERNAME_FIELD = 'email'
