@@ -6,26 +6,37 @@ import { LoaderCircleIcon, SearchIcon } from 'lucide-react'
 
 import { Input } from './input'
 import { Label } from './label'
+import { useFilters } from '@/hooks/useFilters'
+import { useRouter } from 'next/navigation'
 
 const InputSearchLoaderDemo = () => {
-    const [value, setValue] = useState('')
+    const {searchParams , setFilter  , deleteFilter}= useFilters()
+    const router = useRouter()
+
     const [isLoading, setIsLoading] = useState(false)
+    const [searchValue, setsearchValue] = useState(searchParams.get('search') ?? '');
 
     const id = useId()
 
-    useEffect(() => {
-        if (value) {
-            setIsLoading(true)
 
-            const timer = setTimeout(() => {
-                setIsLoading(false)
-            }, 500)
+    useEffect(()=>{
+        const timer = setTimeout(() => {
+            const params  = new URLSearchParams(searchParams.toString())
+            if (searchValue) setFilter('search',searchValue)
+            else deleteFilter('search')
+            setIsLoading(false)
+            
+            
+        }, 1000);
 
-            return () => clearTimeout(timer)
+        setIsLoading(true)
+
+        return () =>  {
+
+            clearTimeout(timer)
+            setIsLoading(false)
         }
-
-        setIsLoading(false)
-    }, [value])
+    },[searchValue ])
 
     return (
         <div className='w-full xl:max-w-2/3 lg:max-w-4/7 space-y-2'>
@@ -38,8 +49,8 @@ const InputSearchLoaderDemo = () => {
                     id={id}
                     type='search'
                     placeholder='Search for courses, skills, or instructors...'
-                    value={value}
-                    onChange={e => setValue(e.target.value)}
+                    value={searchValue}
+                    onChange={e => setsearchValue(e.target.value)}
                     className='peer bg-lightbg px-9 [&::-webkit-search-cancel-button]:appearance-none [&::-webkit-search-decoration]:appearance-none [&::-webkit-search-results-button]:appearance-none [&::-webkit-search-results-decoration]:appearance-none'
                 />
                 {isLoading && (

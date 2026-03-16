@@ -1,5 +1,5 @@
 import Hero from "@/components/organisms/Hero";
-import CoursesSection from "@/components/organisms/CoursesSection";
+import CoursesSection from "@/featuers/courses/components/HomePageCoursesSection";
 import ServicesSection from "@/components/organisms/ServicesSection";
 export default function Home() {
   return (

@@ -99,6 +99,7 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'apps.authentication.utils.CookieJWTAuthentication',
     ),
+
 }
 
 

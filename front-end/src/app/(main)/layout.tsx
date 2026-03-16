@@ -11,10 +11,13 @@ export default function MainLayout({
 }>) {
   return (
     <main
-      className={` font-manrope antialiased bg-lightbg`}
+      className={` font-manrope antialiased bg-lightbg flex flex-col min-h-screen`}
     >
       <NavBar />
-      {children}
+      <main className="flex flex-col flex-1">
+
+        {children}
+      </main>
       <Footer />
     </main>
   );

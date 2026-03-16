@@ -58,7 +58,7 @@ export function LoginForm() {
                 </Link>
                 <Button className="shadow-[0px_10px_15px_-3px_rgba(43,88,105,0.1),0px_4px_6px_-4px_rgba(43,88,105,0.1)] h-12" variant={"darkmint"} disabled={isPending}>
                     { isPending ? (
-                        <ButtonLoading />
+                        <ButtonLoading  />
                     ) : (
                         <>Sign In to Dashboard <FaArrowRight /></>
                     )}

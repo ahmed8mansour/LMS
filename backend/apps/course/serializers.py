@@ -15,7 +15,8 @@ class LectureSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Lecture
-        exclude = ['section']
+        fields='__all__'
+        # exclude = ['section']
     
 
 
@@ -24,7 +25,8 @@ class QuizSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Quiz
-        exclude = ['section']
+        fields='__all__'
+        # exclude = ['section']
     
 
 
@@ -32,7 +34,8 @@ class SectionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Section
-        exclude = ['course']
+        fields='__all__'
+        # exclude = ['course']
 
     def to_representation(self, instance):
         lectures = Lecture.objects.filter(section=instance).order_by('order')
@@ -54,9 +57,10 @@ class CourseSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'title', 'description', 'thumbnail',
             'category', 'level', 'price', 'rating',
-            'subscribers_count', 'reviews_count', 'is_published',
+            'subscribers_count', 'reviews_count', 'is_published','language',
             'last_updated', 'goals_list',
-            'instructor_profile', 'sections',        
+            'instructor_profile', 'sections',   
+            
         ]
 
     def get_instructor_profile(self , obj):
