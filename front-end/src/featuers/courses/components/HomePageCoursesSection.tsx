@@ -18,7 +18,7 @@ import CourseCardSkeleton from "../../../components/molecules/CourseCardSkeleton
 
 export default function CoursesSection() {
     const [selected , setSelected] = useState('all Categories')
-    const {data , isPending } = usePaginatedCourses({'category': selected == "all Categories" ? undefined : [selected]  , 'sort' : 'popular' ,'page_size' : '3'})
+    const {data , error, isPending } = usePaginatedCourses({'category': selected == "all Categories" ? undefined : [selected]  , 'sort' : 'popular' ,'page_size' : '3'})
 
     const courses =  data?.pages[0]?.results
 
@@ -62,6 +62,9 @@ export default function CoursesSection() {
                     
                     {courses?.length === 0 && !isPending &&
                         <div className="text-darkmint font-bold">There is no courses match these filters</div>
+                    }
+                    {error &&
+                        <div className="text-red-500 font-bold text-base">Something went wrong ,try later</div>
                     }
 
                     {isPending && 

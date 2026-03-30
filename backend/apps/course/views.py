@@ -206,5 +206,4 @@ class StudentCourseView(ListAPIView):
     def get_queryset(self):
         queryset = Course.objects.all()
         data = self.request.data
-        print(data)
         return queryset

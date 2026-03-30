@@ -54,8 +54,26 @@ INSTALLED_APPS = [
 
     # Your apps
     'apps.authentication',
-    'apps.course'
+    'apps.course',
+    'apps.enrollment',
+    'apps.progress',
 ]
+
+
+
+
+
+# ================================
+# ================================
+# Stripe Configuration : 
+
+STRIPE_PUBLISHABLE_KEY = env('STRIPE_PUBLISHABLE_KEY')
+STRIPE_SECRET_KEY = env('STRIPE_SECRET_KEY')
+STRIPE_WEBHOOK_SECRET = env('STRIPE_WEBHOOK_SECRET')
+
+# ================================
+# ================================
+
 
 
 SITE_ID = 1 
@@ -235,6 +253,9 @@ AUTH_PASSWORD_VALIDATORS = [
         'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
     },
 ]
+
+QUIZ_PASS_THRESHOLD = 50
+
 
 # Internationalization
 LANGUAGE_CODE = 'en-us'

@@ -15,8 +15,8 @@ class LectureSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Lecture
-        fields='__all__'
-        # exclude = ['section']
+        # fields='__all__'
+        exclude = ['video_url']
     
 
 

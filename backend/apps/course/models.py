@@ -57,7 +57,7 @@ class Section(models.Model):
 
 
 class Lecture(models.Model):
-    section = models.ForeignKey('Section' , on_delete=models.CASCADE)
+    section = models.ForeignKey('Section' , on_delete=models.CASCADE , related_name='lectures')
     title=models.CharField( max_length=255 )    
     duration = models.DecimalField(max_digits=6 , decimal_places=2)
     video_url = models.CharField(max_length=255555)
@@ -68,14 +68,31 @@ class Lecture(models.Model):
         ordering = ['order']  
 
     def __str__(self):
-        return f"{self.id}/  {self.title} , the order: {self.order}"
+        return f"{self.id}/  course: {self.section.course.id} , section:{self.section.order} , the order: {self.order}"
 
 
 class Quiz(models.Model):
-    section = models.OneToOneField('Section' , on_delete=models.CASCADE)
+    section = models.OneToOneField('Section' , on_delete=models.CASCADE , related_name='quiz')
     title=models.CharField( max_length=255 )    
     questions_count = models.IntegerField()
 
     def __str__(self):
         return f"{self.id}/ {self.title}"
 
+
+
+class Question(models.Model):
+    quiz = models.ForeignKey('Quiz' , on_delete=models.CASCADE ,related_name="question")
+    text = models.TextField(null=False , blank=True)
+    order = models.IntegerField()
+    def __str__(self):
+        return f"{self.id} , {self.quiz.id} ,  {self.quiz.section.order} , {self.quiz.section.course.id} "
+
+
+class Choice(models.Model):
+    question = models.ForeignKey('Question' , on_delete=models.CASCADE , related_name="choice")
+    text = models.TextField(null=False , blank=True)
+    is_correct = models.BooleanField()
+
+    def __str__(self):
+        return f"{self.id} , {self.question.id} ,  is correct = {self.is_correct}"
