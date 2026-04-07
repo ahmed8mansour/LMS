@@ -30,6 +30,7 @@ from rest_framework import filters
 from .pagination import CourseCursorPagination
 
 from rest_framework.generics import ListAPIView
+from apps.enrollment.models import Enrollment
 # Create your views here.
 
 
@@ -152,6 +153,19 @@ class StudentCourseViewSet(ReadOnlyModelViewSet):
     filter_backends =[filters.SearchFilter]
     search_fields = ['title', 'description','instructor__title' ,'instructor__user__first_name' ]
     pagination_class = CourseCursorPagination
+    authentication_classes=[CookieJWTAuthentication]
+
+    def retrieve(self, request, *args, **kwargs):
+        user=request.user
+        id= kwargs['pk']
+        enrollment = Enrollment.objects.filter(user=request.user, course=id, is_active=True).first()
+        enrolled_status = True
+        if not enrollment:
+            enrolled_status = False
+        
+        response = super().retrieve(request, *args, **kwargs)
+        response.data['enrolled_status'] = enrolled_status
+        return response
 
     def get_queryset(self):
         queryset   = Course.objects.all()

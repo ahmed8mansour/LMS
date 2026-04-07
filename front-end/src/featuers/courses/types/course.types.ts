@@ -15,6 +15,7 @@ export interface Course {
     goals_list: string[]
     instructor_profile: InstructorProfile
     sections: Section[]
+    enrolled_status?:boolean
 }
 
 export interface InstructorProfile {
@@ -43,7 +44,7 @@ export interface Section {
     order: number
     course: number
     lectures: Lecture[]
-    quiz: Quiz
+    quiz?: Quiz
 }
 
 export interface Lecture {

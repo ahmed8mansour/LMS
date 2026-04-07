@@ -13,7 +13,6 @@ type props = {
 }
 export default function CourseEnrollCard({price , totalHourse}:props) {
     return (
-        <div className="w-full lg:basis-5/13 xl:basis-3/13 h-fit sticky top-8 rounded-2xl bg-white border border-gray-400/40 shadow-lg p-6">
             <div className="flex flex-col gap-6">
                 <div className="flex items-center gap-1">
                     <p className="font-extrabold text-darktext text-3xl">${price}</p>
@@ -49,6 +48,5 @@ export default function CourseEnrollCard({price , totalHourse}:props) {
                     </div>
                 </div>
             </div>
-        </div>
     )
 }

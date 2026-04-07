@@ -9,7 +9,7 @@ export default function CourseGoals({goals} :porps ) {
             <h2 className="text-lg sm:text-xl font-bold text-darktext">What you'll learn</h2>
             <ul className="text-body list-inside space-y-2">
                 {goals.map((goal, index) => (
-                    <li className="flex items-start gap-2 text-xs sm:text-sm/5 font-medium" key={index + 1}>
+                    <li className="flex items-start gap-2 text-xs sm:text-sm/5 font-medium" key={goal}>
                         <FaRegCheckCircle className="w-4 h-4 text-darkmint shrink-0 mt-0.5" />
                         <span>{goal}</span>
                     </li>

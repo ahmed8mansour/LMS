@@ -226,6 +226,7 @@ class InstructorProfile(models.Model):
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='instructor_profile')
     title= models.CharField(max_length=255, blank=True)
     about= models.TextField(blank=True)
+    students_count = models.IntegerField(default=0)
 
     def __str__(self):
         return f'Instructor Profile for {self.user.username}'

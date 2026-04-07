@@ -22,7 +22,9 @@ export default function CourseSections({Sections , totalDuration , totalLectures
                 </div>
                 <div className="course_sections">
 
-                    {Sections.map((section , index) => (
+                    {Sections?.map((section , index) =>{ 
+                    console.log(section)    
+                    return (
                         <Accordion
                         key={index}
                         type="single"
@@ -36,7 +38,7 @@ export default function CourseSections({Sections , totalDuration , totalLectures
                             className="border-b rounded-lg  last:border-b-0 bg-white"
                             >
                             <AccordionTrigger className="bg-darkbg px-4 border-b rounded-b-none ps-11 font-bold text-sm text-darktext min-h-14 ">
-                                Section {index + 1}: {section.title}
+                                Section {index + 1}: {section?.title}
 
                                 <p className="text-graytext2 text-xs font-normal">
                                     {section.lectures.length} lectures • {section.lectures.reduce((total, element) => total + parseFloat(element.duration), 0)} min
@@ -47,12 +49,18 @@ export default function CourseSections({Sections , totalDuration , totalLectures
                                     {section.lectures.map((lecture , index) => (
                                         <CourseSectionItem key={index} title={lecture.title} pretitle={lecture.duration} icon={<FaRegCirclePlay className="text-darkmint w-5 h-6"/>} />
                                     ))}
-                                    <CourseSectionItem title={section.quiz.title} pretitle={`${section.quiz.questions_count} questions`} icon={<MdOutlineQuiz className="text-darkmint w-5 h-6"/>} />
+                                    {section.quiz &&
+                                        <CourseSectionItem title={section.quiz?.title} pretitle={`${section.quiz?.questions_count} questions`} icon={<MdOutlineQuiz className="text-darkmint w-5 h-6"/>} />
+                                    }
                                 </div>
                             </AccordionContent>
                             </AccordionItem>
                         </Accordion>
-                    ))}
+                    )
+                
+                }
+                    
+                    )}
 
                 </div>
 
