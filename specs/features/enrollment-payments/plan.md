@@ -4,6 +4,8 @@
 
 The Enrollment & Payments system uses a **Stripe PaymentIntent-based architecture** with webhook confirmation for secure, PCI-compliant payment processing. The design separates payment creation (client-initiated) from payment confirmation (webhook-driven) for reliability.
 
+**State Management:** Uses **TanStack Query** exclusively (no Zustand) for server state with a cache-first strategy.
+
 ---
 
 ## Key Architectural Decisions
@@ -113,11 +115,55 @@ with transaction.atomic():
 - Prevents partial state (order paid but no enrollment)
 - `select_for_update()` prevents race conditions
 
+### 6. TanStack Query for State Management (No Zustand)
+
+**Decision:** Use TanStack Query exclusively for payment state management.
+
+**Structure:**
+```typescript
+// Query key: ['order', orderId]
+interface OrderDetails {
+  order_id: number;
+  client_secret: string;
+  status: 'pending';
+  amount: string;
+  currency: string;
+  course: Course;
+}
+```
+
+**Cache-First Strategy:**
+```typescript
+// createPaymentIntent mutation
+onSuccess(data) {
+  // Populate query cache for checkout page
+  queryClient.setQueryData(['order', data.order.id], {
+    order_id: data.order.id,
+    client_secret: data.client_secret,
+    status: data.order.status,
+    amount: data.order.amount,
+    currency: data.order.currency,
+    course: course_data,
+  });
+}
+
+// Checkout page
+const { data } = useGetOrderDetail(orderId);
+// First load: returns cached data (no network request)
+// Refresh/stale: refetches from /get-order-details/
+```
+
+**Rationale:**
+- **Single source of truth:** Server state managed by TanStack Query
+- **No redundant state:** Zustand would duplicate TanStack Query's capabilities
+- **Automatic caching:** Built-in cache invalidation, stale time, refetch on window focus
+- **Cleaner architecture:** No separate store files needed
+
 ---
 
 ## Data Flow Architecture
 
-### Payment Creation Flow
+### Payment Creation Flow (TanStack Query)
 
 ```
 User
@@ -143,12 +189,70 @@ Stripe
   ▼
 Backend
   │-- Save PaymentIntent ID to Order
-  │-- Return {client_secret, order_id}
+  │-- Return {client_secret, order: {id, currency, amount, status}}
   │
   ▼
 Frontend
-  │-- Load Stripe Elements with client_secret
-  │-- Display card input form
+  │-- useCreatePaymentIntent.onSuccess():
+  │   queryClient.setQueryData(['order', order.id], {...})
+  │
+  ▼
+Redirect
+  │-- /courses/checkout/{order.id}/
+```
+
+### Checkout Page Load (Cache-First Pattern)
+
+```
+Checkout Page Mount
+  │
+  ▼
+useGetOrderDetail(orderId)
+  │
+  ├── Cache Exists? (first load) ──┐
+  │                                 ▼
+  │                      Returns cached data immediately
+  │                      No network request
+  │
+  └── Cache Missing/Stale? (refresh) ──┐
+                                       ▼
+                          POST /get-order-details/
+                          │
+                          ▼
+                          Backend validates:
+                          - Order belongs to current user
+                          - Order matches course_id
+                          - Order status is "pending"
+                          │
+                          ▼
+                          Returns fresh {client_secret, course}
+                          │
+                          ▼
+                          Updates TanStack Query cache
+```
+
+### State Recovery Decision Tree
+
+```
+Checkout Page Entry
+  │
+  ├─ Has orderID param? ──┐
+  │                       │
+  │   No                  ▼
+  │                Redirect to course page
+  │   Yes               │
+  │                     ▼
+  │    ├─ TanStack Query cache valid? ──┐
+  │    │                                 │
+  │    │   Yes (first load)              ▼
+  │    │                       Use cached data
+  │    │                       (Fast path - no network)
+  │    │                                 │
+  │    │   No (refresh/stale)            ▼
+  │    │                       Fetch /get-order-details/
+  │    │                       Validate ownership
+  │    │                       Update cache
+  │    │                       (Recovery path)
 ```
 
 ### Payment Confirmation Flow
@@ -251,6 +355,26 @@ class CreatePaymentIntentView(APIView):
 - Only authenticated users can purchase
 - Prevents anonymous order creation
 - User identity from JWT
+
+### Order Ownership Validation
+
+```python
+class GetOrderDetailsView(APIView):
+    def post(self, request):
+        order = Order.objects.get(id=order_id)
+        
+        # Verify order belongs to current user
+        if order.user_id != request.user.id:
+            return Response(
+                {'error': 'You do not have permission to access this order'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+```
+
+**Why:**
+- Prevents accessing another user's payment data
+- Returns 403 on user mismatch
+- Returns 404 if order not found or not pending
 
 ### Race Condition Prevention
 
@@ -387,30 +511,135 @@ apps/enrollment/
 │   └── Enrollment
 ├── views.py
 │   ├── CreatePaymentIntentView
+│   ├── GetOrderDetailsView         # State recovery endpoint
 │   └── StripeWebhookView
 ├── serializers.py
-│   └── CreatePaymentSerializer
+│   ├── CreatePaymentSerializer
+│   ├── GetOrderDetailsSerializer
+│   ├── OrderDetailsResponseSerializer
+│   ├── OrderSummarySerializer      # For create-payment-intent response
+│   └── EnrollmentSerializer
 ├── urls.py
 │   ├── create-payment-intent/
+│   ├── get-order-details/          # Recovery endpoint
 │   └── payment-webhook/
 └── signals.py
     └── update_subscribers_count
 ```
 
-### Frontend (Not Implemented)
+**Create Payment Intent Response:**
+```python
+# POST /enrollment/create-payment-intent/
+# Response (200):
+{
+    "client_secret": "pi_xxx_secret_xxx",
+    "order": {
+        "id": 123,
+        "currency": "USD",
+        "amount": "29.99",
+        "status": "pending"
+    }
+}
+```
+
+**Get Order Details Response:**
+```python
+# POST /enrollment/get-order-details/
+# Response (200):
+{
+    "order_id": 123,
+    "client_secret": "pi_xxx_secret_xxx",
+    "status": "pending",
+    "amount": "29.99",
+    "currency": "USD",
+    "course": {
+        "id": 1,
+        "title": "Course Title",
+        "thumbnail": "/media/...",
+        "instructor_name": "John Doe",
+        "price": "29.99"
+    }
+}
+```
+
+### Frontend
 ```
 featuers/enrollment/
 ├── api/
-│   └── enrollment.api.ts
+│   └── enrollment.api.ts           # API functions
 ├── components/
-│   ├── PaymentModal.tsx
-│   ├── PaymentForm.tsx
-│   └── PaymentSuccess.tsx
+│   ├── CourseEnrollCard.tsx        # "Enroll Now" button
+│   └── CourseCheckout.tsx          # Checkout page
 ├── hooks/
-│   ├── useCreatePaymentIntent.ts
-│   └── usePaymentConfirmation.ts
-└── types/
-    └── enrollment.types.ts
+│   ├── useCreatePaymentIntent.ts   # Mutation for creating payment
+│   └── useGetOrderDetail.ts        # Query for order details
+├── types/
+│   └── enrollment.types.ts         # TypeScript interfaces
+└── index.ts
+
+app/(main)/courses/checkout/
+└── [orderID]/
+    └── page.tsx                    # Checkout route page
+```
+
+**useCreatePaymentIntent Hook:**
+```typescript
+export function useCreatePaymentIntent() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: enrollmentAPI.createPaymentIntent,
+        onSuccess(data: CreatePaymentIntentResponse, variables) {
+            // Get course data from cache
+            const course_data = queryClient.getQueryData(['course', variables]);
+
+            // Populate query cache for checkout page
+            queryClient.setQueryData(['order', data.order.id], {
+                order_id: data.order.id,
+                client_secret: data.client_secret,
+                status: data.order.status,
+                amount: data.order.amount,
+                currency: data.order.currency,
+                course: course_data,
+            } as OrderDetails);
+
+            toastsuccess('Order created successfully');
+        },
+        onError(error, variables) {
+            handleAuthError(error, 'Creating Order Failed');
+        },
+    });
+}
+```
+
+**useGetOrderDetail Hook:**
+```typescript
+export function useGetOrderDetail(id: string | null) {
+    return useQuery({
+        queryKey: ['order', id],
+        queryFn: id ? () => enrollmentAPI.getOrderDetail(id) : skipToken,
+        staleTime: 5 * 60 * 1000, // 5 minutes
+    });
+}
+```
+
+**CourseCheckout Component:**
+```typescript
+export function CourseCheckout() {
+    // Get order_id from route params
+    const params = useParams();
+    const order_id = params.orderID as string | undefined;
+
+    // Use TanStack Query - cache-first strategy
+    const { data: orderData } = useGetOrderDetail(order_id || null);
+
+    // Data sourced from TanStack Query cache
+    const course_data = orderData?.course;
+
+    return (
+        // ... checkout UI
+    );
+}
 ```
 
 ---
@@ -491,6 +720,8 @@ def test_payment_flow():
         'course': course.id
     })
     assert response.status_code == 200
+    assert 'client_secret' in response.data
+    assert 'order' in response.data
     
     # Simulate webhook
     webhook_response = client.post(
@@ -520,6 +751,12 @@ def test_payment_flow():
    - Send same webhook twice
    - Verify single enrollment (idempotency)
 
+4. **Cache-First Behavior:**
+   - Create payment intent
+   - Navigate to checkout (should use cache)
+   - Refresh page (should refetch)
+   - Verify order ownership validation
+
 ---
 
 ## Monitoring & Logging
@@ -539,22 +776,6 @@ logger.error(f"Webhook processing failed: {error}")
 2. **Payment Success Rate:** Successful / Total attempts
 3. **Webhook Latency:** Time from Stripe event to processing
 4. **Enrollment Rate:** Orders → Active enrollments
-
----
-
-## Alternative Approaches Considered
-
-### 1. PayPal Integration
-**Rejected:** Stripe chosen for better developer experience and documentation
-
-### 2. Custom Payment Processor
-**Rejected:** PCI compliance burden too high
-
-### 3. Payment on Delivery
-**Rejected:** Not practical for digital courses
-
-### 4. Cryptocurrency
-**Rejected:** Too complex for MVP
 
 ---
 
@@ -581,3 +802,8 @@ logger.error(f"Webhook processing failed: {error}")
 - Check webhook processing logs
 - Verify transaction.atomic() not rolling back
 - Check for unhandled exceptions
+
+**Checkout page shows loading forever:**
+- Verify TanStack Query cache is populated
+- Check useGetOrderDetail hook is called with correct order ID
+- Verify /get-order-details/ endpoint returns 200

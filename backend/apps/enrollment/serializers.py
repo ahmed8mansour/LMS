@@ -34,6 +34,44 @@ class CreatePaymentSerializer(serializers.Serializer):
 
         return data
 
+
+class GetOrderDetailsSerializer(serializers.Serializer):
+    order_id = serializers.IntegerField()
+
+    def validate_order_id(self, value):
+        try:
+            order = Order.objects.get(id=value)
+        except Order.DoesNotExist:
+            raise serializers.ValidationError("Order not found")
+        return value
+
+
+class OrderDetailsResponseSerializer(serializers.Serializer):
+    order_id = serializers.IntegerField()
+    client_secret = serializers.CharField()
+    status = serializers.CharField()
+    course = serializers.SerializerMethodField()
+    amount = serializers.DecimalField(max_digits=6, decimal_places=2)
+    currency = serializers.CharField()
+
+    def get_course(self, obj):
+        return {
+            'id': obj.course.id,
+            'title': obj.course.title,
+            'thumbnail': obj.course.thumbnail.url if obj.course.thumbnail else None,
+            'instructor_name': obj.course.instructor.get_full_name() or obj.course.instructor.email,
+            'price': str(obj.course.price)
+        }
+
+
+class OrderSummarySerializer(serializers.ModelSerializer):
+    """Serializer for order summary in payment intent response."""
+    class Meta:
+        model = Order
+        fields = ['id', 'currency', 'amount', 'status']
+        read_only_fields = fields
+
+
 class OrderSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order

@@ -10,14 +10,14 @@ from apps.authentication.utils import CookieJWTAuthentication
 
 
 from rest_framework.generics import ListAPIView
-from .serializers import OrderSerializer , CreatePaymentSerializer
+from .serializers import OrderSerializer , CreatePaymentSerializer, GetOrderDetailsSerializer, OrderDetailsResponseSerializer, OrderSummarySerializer
 
 from django.db import transaction
 from apps.course.models import Course
 from .models import Order , Transaction , Enrollment
 import stripe
 
-
+from apps.course.serializers import CourseSerializer
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 
@@ -37,13 +37,13 @@ class CreatePaymentIntentView(APIView):
         serializer = CreatePaymentSerializer(data = request.data  , context={'request':request})
         if not serializer.is_valid():
             return Response(serializer.errors , status=status.HTTP_400_BAD_REQUEST)
-        
+
         course = Course.objects.get(id = serializer.validated_data['course'])
         try:
             with transaction.atomic():
                 order = Order.objects.create(
                     user = request.user,
-                    course = course , 
+                    course = course ,
                     status = 'pending',
                     amount = course.price,
                     currency = 'USD'
@@ -54,7 +54,7 @@ class CreatePaymentIntentView(APIView):
                     currency='usd',
                     automatic_payment_methods={
                         'enabled': True,
-                        'allow_redirects': 'never'   
+                        'allow_redirects': 'never'
                     },
                     metadata={
                         'order_id' : order.id,
@@ -75,12 +75,77 @@ class CreatePaymentIntentView(APIView):
                 {'error': 'something went wrong'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-        
+
+        # Use serializer for clean data conversion
+        order_serializer = OrderSummarySerializer(order)
+
         return Response({
             'client_secret' : intent.client_secret,
-            'order_id' : order.id,
+            'order' : order_serializer.data,
         } , status=status.HTTP_200_OK)
-    
+
+
+class GetOrderDetailsView(APIView):
+    """
+    Retrieve order details for state recovery after page refresh.
+    Validates order belongs to current user and is still pending.
+    """
+    authentication_classes = [CookieJWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = GetOrderDetailsSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(
+                {'error': serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        order_id = serializer.validated_data['order_id']
+
+        try:
+            order = Order.objects.select_related('course', 'course__instructor').get(id=order_id)
+        except Order.DoesNotExist:
+            return Response(
+                {'error': 'Order not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Security: Verify order belongs to current user
+        if order.user_id != request.user.id:
+            return Response(
+                {'error': 'You do not have permission to access this order'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Security: Verify order is still pending
+        if order.status != 'pending':
+            return Response(
+                {'error': f'Order is {order.status}, cannot proceed with payment'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Get fresh client_secret from Stripe
+        try:
+            intent = stripe.PaymentIntent.retrieve(order.stripe_payment_intent_id)
+            client_secret = intent.client_secret
+        except stripe.error.StripeError:
+            return Response(
+                {'error': 'Failed to retrieve payment information from Stripe'},
+                status=status.HTTP_502_BAD_GATEWAY
+            )
+
+        # Serialize response
+        response_data = {
+            'order_id': order.id,
+            'client_secret': client_secret,
+            'status': order.status,
+            'amount': str(order.amount),
+            'currency': order.currency,
+            'course': CourseSerializer(order.course).data
+        }
+
+        return Response(response_data, status=status.HTTP_200_OK)
 
 
 # stripe payment_intents confirm pi_3TDL3cEzoqWKETIS0kmfPgwN --payment-method pm_card_visa
@@ -102,9 +167,6 @@ class StripeWebhookView(APIView):
         except stripe.error.SignatureVerificationError:
             return Response({'error': 'Invalid signature'}, status=400)
         
-        print(event['data'])
-        print(event['data']['object'])
-        print(event['data']['object']['metadata'])
         if event['type'] == 'payment_intent.succeeded':
             self.handle_payment_succeeded(event['data']['object'])
 

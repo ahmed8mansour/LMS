@@ -1,4 +1,4 @@
-export interface Course {
+export interface CourseSummary {
     id: number
     title: string
     description: string
@@ -12,10 +12,13 @@ export interface Course {
     reviews_count: number
     is_published: boolean
     last_updated: string
-    goals_list: string[]
     instructor_profile: InstructorProfile
+    enrolled_status?: boolean
+}
+
+export interface Course extends CourseSummary {
+    goals_list: string[]
     sections: Section[]
-    enrolled_status?:boolean
 }
 
 export interface InstructorProfile {

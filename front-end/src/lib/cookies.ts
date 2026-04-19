@@ -10,8 +10,6 @@ export const removeCookies  =  (TOKEN_KEY:string) => Cookies.remove(TOKEN_KEY)
 
 export const setCookies =  (TOKEN_KEY:string, token:string) => {
 
-    console.log(TOKEN_KEY)
-    console.log(token)
     Cookies.set(TOKEN_KEY , token , {
         secure: true,
         sameSite: 'strict',

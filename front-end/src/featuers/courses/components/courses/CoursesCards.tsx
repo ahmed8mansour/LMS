@@ -38,16 +38,7 @@ export function CoursesCards() {
                 {courses.map((course, idx) => (
                     <CourseCard
                         key={idx}
-                        id={course.id}
-                        ImageUrl={course.thumbnail}
-                        Name={course.title}
-                        About={course.description}
-                        Price={parseInt(course.price)}
-                        AvaterUrl={course.instructor_profile.profile_picture}
-                        Instructor={course.instructor_profile.first_name}
-                        Rate={course.rating}
-                        Subscribers={course.subscribers_count}
-                        Tag={course.category}
+                        course={course}
                     />
                 ))}
             </div>

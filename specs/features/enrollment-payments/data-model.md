@@ -246,7 +246,34 @@ interface CreatePaymentIntentRequest {
 
 interface CreatePaymentIntentResponse {
     client_secret: string;   // Stripe client secret
-    order_id: number;        // Our order ID
+    order: {
+        id: number;          // Order ID
+        currency: string;    // USD
+        amount: string;      // Decimal as string
+        status: 'pending' | 'paid' | 'failed' | 'refunded';
+    };
+}
+
+// State Recovery Endpoint
+interface GetOrderDetailsRequest {
+    order_id: number;        // Order ID from URL
+}
+
+interface GetOrderDetailsResponse {
+    order_id: number;
+    client_secret: string;   // Fresh client secret
+    status: 'pending' | 'paid' | 'failed' | 'refunded';
+    course: CourseSummary;   // Course details
+    amount: string;
+    currency: string;
+}
+
+interface CourseSummary {
+    id: number;
+    title: string;
+    thumbnail: string;
+    instructor_name: string;
+    price: string;
 }
 
 interface PaymentWebhookEvent {
@@ -261,6 +288,16 @@ interface PaymentWebhookEvent {
             };
         };
     };
+}
+
+// TanStack Query Cache Structure
+interface OrderDetails {
+    order_id: number;
+    client_secret: string;
+    status: 'pending' | 'paid' | 'failed' | 'refunded';
+    amount: string;
+    currency: string;
+    course: CourseSummary;
 }
 ```
 
@@ -356,6 +393,47 @@ CustomUser.delete()
 - Orders protected from deletion to preserve audit trail
 - Enrollments protected from order deletion to maintain access records
 - Transactions cascade (they're just audit logs)
+
+### Get Order Details for State Recovery
+```python
+def get_order_details(request, order_id):
+    """
+    Frontend calls this to recover payment session.
+    Validates order belongs to current user and is still pending.
+    Used by TanStack Query's useGetOrderDetail hook.
+    """
+    try:
+        order = Order.objects.select_related('course', 'course__instructor').get(
+            id=order_id,
+            user=request.user,
+            status='pending'  # Only return if still pending
+        )
+        
+        # Get fresh client_secret from Stripe
+        intent = stripe.PaymentIntent.retrieve(order.stripe_payment_intent_id)
+        
+        return {
+            'order_id': order.id,
+            'client_secret': intent.client_secret,
+            'status': order.status,
+            'course': {
+                'id': order.course.id,
+                'title': order.course.title,
+                'thumbnail': order.course.thumbnail.url if order.course.thumbnail else None,
+                'instructor_name': order.course.instructor.get_full_name(),
+                'price': str(order.amount)
+            },
+            'amount': str(order.amount),
+            'currency': order.currency
+        }
+    except Order.DoesNotExist:
+        return {'error': 'Order not found or not accessible'}, 404
+```
+
+**Security Checks:**
+1. Order must belong to `request.user` (returns 403 if not)
+2. Order status must be `pending` (returns 404 if paid/failed)
+3. Order ID in URL must match the requested order
 
 ---
 
@@ -502,6 +580,60 @@ def get_course_content(request, course_id):
         return Response({"error": "Not enrolled"}, status=403)
     
     # Return course content...
+```
+
+### Frontend State Recovery (TanStack Query)
+```typescript
+// hooks/useGetOrderDetail.ts
+export function useGetOrderDetail(orderId: string | null) {
+  return useQuery({
+    queryKey: ['order', orderId],
+    queryFn: orderId ? () => enrollmentAPI.getOrderDetail(orderId) : skipToken,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+}
+
+// CourseCheckout component
+export function CourseCheckout() {
+  const params = useParams();
+  const order_id = params.orderID as string | undefined;
+
+  // Cache-first strategy:
+  // - First load: uses cached data from createPaymentIntent (no network request)
+  // - Refresh/stale: refetches from /get-order-details/
+  const { data: orderData, isLoading, error } = useGetOrderDetail(order_id || null);
+
+  const course_data = orderData?.course;
+
+  // ... render checkout UI
+}
+```
+
+### TanStack Query Cache Structure
+```typescript
+// Query key: ['order', orderId]
+interface OrderDetails {
+  order_id: number;          // Order ID
+  client_secret: string;     // Stripe client secret
+  status: 'pending';         // Order status
+  amount: string;            // Decimal as string
+  currency: 'USD';           // Currency code
+  course: CourseSummary;     // Course details
+}
+
+// Cache populated by createPaymentIntent mutation
+onSuccess(data: CreatePaymentIntentResponse, variables) {
+  const course_data = queryClient.getQueryData(['course', variables]);
+  
+  queryClient.setQueryData(['order', data.order.id], {
+    order_id: data.order.id,
+    client_secret: data.client_secret,
+    status: data.order.status,
+    amount: data.order.amount,
+    currency: data.order.currency,
+    course: course_data,
+  } as OrderDetails);
+}
 ```
 
 ### Create Order and PaymentIntent

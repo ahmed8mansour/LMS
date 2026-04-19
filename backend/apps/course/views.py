@@ -149,31 +149,18 @@ class InstructorQuizViewSet(ModelViewSet):
 class StudentCourseViewSet(ReadOnlyModelViewSet):
     queryset = Course.objects.all()
     serializer_class = CourseSerializer
-    # applying search filters using DRF filters (filters_backed) >> no external library needed
-    filter_backends =[filters.SearchFilter]
-    search_fields = ['title', 'description','instructor__title' ,'instructor__user__first_name' ]
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['title', 'description', 'instructor__title', 'instructor__user__first_name']
     pagination_class = CourseCursorPagination
-    authentication_classes=[CookieJWTAuthentication]
-
-    def retrieve(self, request, *args, **kwargs):
-        user=request.user
-        id= kwargs['pk']
-        enrollment = Enrollment.objects.filter(user=request.user, course=id, is_active=True).first()
-        enrolled_status = True
-        if not enrollment:
-            enrolled_status = False
-        
-        response = super().retrieve(request, *args, **kwargs)
-        response.data['enrolled_status'] = enrolled_status
-        return response
+    authentication_classes = [CookieJWTAuthentication]
 
     def get_queryset(self):
-        queryset   = Course.objects.all()
+        queryset = Course.objects.all()
         categories = self.request.query_params.getlist('category')
-        level      = self.request.query_params.get('level')
-        min_price  = self.request.query_params.get('min_price')
-        max_price  = self.request.query_params.get('max_price')
-        rating     = self.request.query_params.get('rating')
+        level = self.request.query_params.get('level')
+        min_price = self.request.query_params.get('min_price')
+        max_price = self.request.query_params.get('max_price')
+        rating = self.request.query_params.get('rating')
 
         if categories:
             queryset = queryset.filter(category__in=categories)
@@ -186,18 +173,45 @@ class StudentCourseViewSet(ReadOnlyModelViewSet):
         if rating:
             queryset = queryset.filter(rating__gte=rating)
 
-        # ─── Sort ─────────────────────────────────
-        # sort = self.request.query_params.get('sort', 'newest')  # default: newest
-
-        # sort_map = {
-        #     'newest':  '-last_updated',
-        #     'popular': '-subscribers_count',
-        #     'system':  'id',           
-        # }
-
-        # order_by = sort_map.get(sort, '-last_updated')  # default (fallback): newest
-        # queryset = queryset.order_by(order_by)
         return queryset
+
+    def get_enrolled_course_ids(self, user, course_ids):
+        """Get set of course IDs where user is enrolled"""
+        if not user.is_authenticated:
+            return set()
+        enrolled = Enrollment.objects.filter(
+            user=user,
+            course_id__in=course_ids,
+            is_active=True
+        ).values_list('course_id', flat=True)
+        return set(enrolled)
+
+    def list(self, request, *args, **kwargs):
+        response = super().list(request, *args, **kwargs)
+
+        if request.user.is_authenticated:
+            course_ids = [item['id'] for item in response.data['results']]
+            enrolled_ids = self.get_enrolled_course_ids(request.user, course_ids)
+
+            for item in response.data['results']:
+                item['enrolled_status'] = item['id'] in enrolled_ids
+
+        return response
+
+    def retrieve(self, request, *args, **kwargs):
+        response = super().retrieve(request, *args, **kwargs)
+
+        if request.user.is_authenticated:
+            enrollment = Enrollment.objects.filter(
+                user=request.user,
+                course_id=kwargs['pk'],
+                is_active=True
+            ).exists()
+            response.data['enrolled_status'] = enrollment
+        else:
+            response.data['enrolled_status'] = False
+
+        return response
 
 class StudentSectionViewSet(ReadOnlyModelViewSet):
     queryset = Section.objects.all()
@@ -213,11 +227,33 @@ class StudentQuizViewSet(ReadOnlyModelViewSet):
 
 
 
-# not requierd pagination >> for homepage 
+# not requierd pagination >> for homepage
 class StudentCourseView(ListAPIView):
     serializer_class = CourseSerializer
 
     def get_queryset(self):
         queryset = Course.objects.all()
-        data = self.request.data
         return queryset
+
+    def get_enrolled_course_ids(self, user, course_ids):
+        """Get set of course IDs where user is enrolled"""
+        if not user.is_authenticated:
+            return set()
+        enrolled = Enrollment.objects.filter(
+            user=user,
+            course_id__in=course_ids,
+            is_active=True
+        ).values_list('course_id', flat=True)
+        return set(enrolled)
+
+    def list(self, request, *args, **kwargs):
+        response = super().list(request, *args, **kwargs)
+
+        if request.user.is_authenticated:
+            course_ids = [item['id'] for item in response.data['results']]
+            enrolled_ids = self.get_enrolled_course_ids(request.user, course_ids)
+
+            for item in response.data['results']:
+                item['enrolled_status'] = item['id'] in enrolled_ids
+
+        return response

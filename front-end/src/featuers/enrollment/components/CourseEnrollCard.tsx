@@ -1,3 +1,4 @@
+"use client";
 import { Button } from "@/components/atoms/button";
 import { FaArrowRight } from "react-icons/fa";
 import { MdOndemandVideo } from "react-icons/md";
@@ -5,13 +6,33 @@ import { IoInfiniteOutline } from "react-icons/io5";
 import { RiArticleLine } from "react-icons/ri";
 import { FaTv } from "react-icons/fa6";
 import { LiaCertificateSolid } from "react-icons/lia";
-
-
+import { usePathname } from "next/navigation";
+import { useParams } from "next/navigation";
+import { useCreatePaymentIntent } from "../hooks/useCreatePaymentIntent";
+import { useRouter } from "next/navigation";
+import ButtonLoading from "@/components/atoms/buttonloading";
 type props = {
     price: string 
     totalHourse : string
 }
 export default function CourseEnrollCard({price , totalHourse}:props) {
+    const params = useParams()
+    const router = useRouter()
+    const id = params.id 
+
+    const { mutate:DoCreatePaymentIntent, isPending , isSuccess , isError  } = useCreatePaymentIntent();
+
+    const  CreatePayment = () => {
+        DoCreatePaymentIntent(id as string,{
+                onSuccess : (data)=>{
+                    // Navigate to checkout page with order ID in URL
+                    router.push(`/courses/checkout/${data.order.id}/`)
+                }
+            }
+        )
+
+    }
+
     return (
             <div className="flex flex-col gap-6">
                 <div className="flex items-center gap-1">
@@ -20,8 +41,13 @@ export default function CourseEnrollCard({price , totalHourse}:props) {
                     <p className="font-normal text-sm text-[#16A34A]"> 40% Off </p>
                 </div>
                 <div>
-                    <Button className="h-12 w-full mb-3" variant={"darkmint"}>
-                        Enroll Now <FaArrowRight />
+                    <Button className="h-12 w-full mb-3" variant={"darkmint"} onClick={CreatePayment} disabled={isPending}>
+                        
+                        {isPending ? 
+                            <ButtonLoading />
+                            :
+                            <>Enroll Now <FaArrowRight /></>
+                        }
                     </Button>
                     <Button className="h-12 w-full bg-darkbg" variant={"outline"}>
                         Add to Cart

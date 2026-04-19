@@ -7,7 +7,7 @@ interface Toastmessage {
     body?: string
 }
 
-export const toastsuccess = (head: string, body: string) => {
+export const toastsuccess = (head: string, body?: string) => {
     toast.success(head, {
         position: "top-right",
         description: body,
@@ -29,7 +29,10 @@ export function handleAuthError(error: any, fallbackHead: string = 'Authenticati
         toasterror('Network Error', "Can't connect to server")
         return
     }
-
+    if (error.response.status == "401") {
+        toasterror(fallbackHead, "please sign in first ")
+        return
+    }
     // Extract error message from response
     const message = error.response.data?.error || error.response.data?.detail || 'Something went wrong'
     const displayMessage = typeof message === 'string' ? message : Array.isArray(message) ? message.join('\n') : 'Something went wrong'

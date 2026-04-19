@@ -9,8 +9,9 @@ export default function CourseFeedback({rating} : {rating : number}) {
                 <div className="flex flex-col item-center text-center gap-2 basis-1/3 xl:basis-1/4">
                     <h2 className="font-extrabold text-6xl text-darktext">{rating}</h2>
                     <div className="flex items-center justify-center gap-.5">
-                        {Array.from({length:rating}).map((num) => (
+                        {Array.from({length:rating}).map((num , index) => (
                             <IoMdStarOutline
+                                key={index}
                                 size={24}
                                 className={`me-.5 w-4 h-4 text-[#FACC15] `}
                             />

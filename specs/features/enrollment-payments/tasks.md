@@ -1,12 +1,13 @@
 # Enrollment & Payments - Tasks
 
-## Status: BACKEND COMPLETE / FRONTEND MISSING
+## Status: BACKEND COMPLETE / FRONTEND IN PROGRESS (TANSTACK QUERY)
 
 ---
 
 ## Backend Tasks
 
 ### Models
+
 - [x] Order model
   - [x] course (FK)
   - [x] user (FK)
@@ -29,14 +30,23 @@
 - [x] Unique constraint (user, course) on Enrollment
 
 ### Payment API
+
 - [x] CreatePaymentIntentView
   - [x] POST endpoint
   - [x] Authentication required
   - [x] Course validation
   - [x] Order creation with transaction.atomic
   - [x] Stripe PaymentIntent creation
-  - [x] Return client_secret
+  - [x] Return client_secret + order summary
   - [x] Error handling (StripeError, Exception)
+- [x] GetOrderDetailsView (for state recovery)
+  - [x] POST endpoint
+  - [x] Authentication required
+  - [x] Order validation (exists, belongs to user)
+  - [x] Check order status is 'pending'
+  - [x] Return {client_secret, order, course}
+  - [x] Return 403 if wrong user
+  - [x] Return 404 if order not found/not pending
 - [x] StripeWebhookView
   - [x] POST endpoint
   - [x] CSRF exempt
@@ -50,6 +60,7 @@
   - [x] Always return 200
 
 ### Payment Processing
+
 - [x] Stripe SDK integration
 - [x] PaymentIntent creation with metadata
 - [x] Automatic payment methods enabled
@@ -57,6 +68,7 @@
 - [x] Metadata includes order_id, course_id, user_id
 
 ### Security
+
 - [x] Webhook signature verification
 - [x] CSRF exemption for webhooks only
 - [x] Authentication on create-payment-intent
@@ -64,6 +76,7 @@
 - [x] select_for_update on order (prevent race conditions)
 
 ### Error Handling
+
 - [x] StripeError handling (502 response)
 - [x] Generic Exception handling (500 response)
 - [x] Order.DoesNotExist handling (silent fail for webhooks)
@@ -74,74 +87,95 @@
 
 ## Frontend Tasks
 
-### Stripe Integration (Not Implemented)
-- [ ] Install @stripe/stripe-js
-- [ ] Install @stripe/react-stripe-js
-- [ ] Configure Stripe publishable key
-- [ ] Create Stripe provider wrapper
-- [ ] Create payment modal component
-- [ ] Create card input component
-- [ ] Implement payment confirmation
+### Stripe Integration
 
-### Payment Flow UI (Not Implemented)
-- [ ] Payment modal/sheet
-  - [ ] Course summary display
-  - [ ] Price breakdown
-  - [ ] Card input (Stripe Elements)
-  - [ ] Pay button
-  - [ ] Cancel button
-- [ ] Processing state
-  - [ ] Loading spinner
-  - [ ] "Processing payment..." message
-- [ ] Success state
-  - [ ] Success animation
-  - [ ] "Payment successful" message
-  - [ ] "Go to course" button
-  - [ ] "Go to dashboard" button
-- [ ] Error state
-  - [ ] Error message display
-  - [ ] Card declined message
-  - [ ] Retry button
-  - [ ] Contact support link
+- [x] Install @stripe/stripe-js
+- [x] Install @stripe/react-stripe-js
+- [x] Configure Stripe publishable key
+- [x] Create Stripe Elements wrapper
 
-### Enrollment Button Integration (Not Implemented)
-- [ ] Connect "Enroll Now" to payment flow
-  - [ ] Check authentication
-  - [ ] Check if already enrolled
-  - [ ] Create payment intent API call
-  - [ ] Open payment modal
-- [ ] Loading state on button
-- [ ] Success redirect to dashboard
-- [ ] Error toast notifications
+### State Management (TanStack Query - No Zustand)
 
-### API Layer (Not Implemented)
-- [ ] enrollmentAPI.createPaymentIntent(courseId)
-- [ ] enrollmentAPI.checkEnrollmentStatus(courseId)
+- [x] Use TanStack Query for server state
+  - [x] Query key: `['order', orderId]`
+  - [x] Cache populated by createPaymentIntent mutation
+  - [x] staleTime: 5 minutes
+  - [x] No localStorage/sessionStorage (memory only)
 
-### Hooks (Not Implemented)
-- [ ] useCreatePaymentIntent
-- [ ] usePaymentConfirmation
-- [ ] useEnrollmentStatus
+### Checkout Flow (Cache-First Pattern)
 
-### Types (Not Implemented)
-- [ ] PaymentIntentResponse TypeScript interface
-- [ ] Order TypeScript interface
-- [ ] Transaction TypeScript interface
-- [ ] Enrollment TypeScript interface
+- [x] Checkout Page (`/courses/checkout/{orderID}/`)
+  - [x] Accept orderID from route params
+  - [x] useGetOrderDetail hook reads from TanStack Query cache
+  - [x] First load: uses cached data (no network request)
+  - [x] Refresh/stale: refetches from /get-order-details/
+  - [x] Loading state during recovery
+  - [x] Redirect on validation failure
+
+### Payment Form
+
+- [x] CheckoutForm component
+  - [x] Stripe PaymentElement integration
+  - [x] Confirm card payment
+  - [x] Loading states (isPending, "Processing..." button)
+  - [x] Error display (user-friendly messages for declined cards, insufficient funds, etc.)
+- [x] Order Summary display
+  - [x] Course details from TanStack Query cache
+  - [x] Price breakdown
+- [x] Processing state
+  - [x] "Processing payment..." message with loader
+- [x] Success handling
+  - [x] Redirect to dashboard/learning page
+- [x] Error handling
+  - [x] Card declined message
+  - [x] Retry option
+
+### Enrollment Button Integration
+
+- [x] Update "Enroll Now" button
+  - [x] Check authentication
+  - [x] Check if already enrolled
+  - [x] Create payment intent API call
+  - [x] Cache response in TanStack Query
+  - [x] Redirect to checkout with orderID in route
+- [x] Loading state on button
+- [x] Error toast notifications
+
+### API Layer
+
+- [x] enrollmentAPI.createPaymentIntent(courseId)
+- [x] enrollmentAPI.getOrderDetails(orderId)
+
+### Hooks
+
+- [x] useCreatePaymentIntent (mutation)
+- [x] useGetOrderDetail (query)
+- [x] usePaymentConfirmation
+
+### Types
+
+- [x] OrderSummary interface
+- [x] CreatePaymentIntentResponse interface
+- [x] OrderDetails interface
+- [x] Clean TypeScript typing throughout
 
 ---
 
 ## Integration Tasks
 
 ### Backend Integration
+
 - [x] Course model integration (Order.course)
 - [x] User model integration (Order.user, Enrollment.user)
 - [x] Enrollment signals (update subscribers_count)
 - [x] Progress API integration (enrollment check)
 
-### Frontend Integration (Not Implemented)
-- [ ] CourseEnrollCard integration
-- [ ] Course detail page integration
+### Frontend Integration (In Progress)
+
+- [x] CourseEnrollCard integration
+- [x] TanStack Query cache integration
+- [x] Course detail page integration
+- [x] Dashboard page created (placeholder for enrolled courses)
 - [ ] Dashboard integration (show enrolled courses)
 - [ ] Navbar integration (enrollment count)
 
@@ -150,6 +184,7 @@
 ## Testing Tasks
 
 ### Backend Tests
+
 - [ ] Unit test: Order creation
 - [ ] Unit test: Transaction creation
 - [ ] Unit test: Enrollment creation
@@ -159,13 +194,16 @@
 - [ ] Security test: Webhook signature verification
 - [ ] Security test: Unauthorized payment creation
 
-### Frontend Tests (Not Applicable - Not Implemented)
+### Frontend Tests
+
+- [ ] TanStack Query cache tests
 - [ ] Payment form validation
 - [ ] Payment confirmation flow
-- [ ] Error handling tests
+- [x] Error handling (user-friendly messages for card declined, insufficient funds, expired card, etc.)
 - [ ] E2E test: Complete purchase flow
 
 ### Manual Testing
+
 - [ ] Test with Stripe test cards
   - [ ] Successful payment
   - [ ] Declined card
@@ -173,12 +211,14 @@
 - [ ] Test webhook handling
 - [ ] Test enrollment after payment
 - [ ] Test duplicate webhook calls
+- [ ] Test cache-first behavior (first load vs refresh)
 
 ---
 
 ## Deployment Tasks
 
 ### Stripe Configuration
+
 - [ ] Create Stripe account
 - [ ] Get API keys
 - [ ] Configure webhook endpoint
@@ -186,6 +226,7 @@
 - [ ] Test webhooks in Stripe CLI
 
 ### Environment Setup
+
 - [ ] Add STRIPE_PUBLISHABLE_KEY to frontend .env
 - [ ] Add STRIPE_SECRET_KEY to backend .env
 - [ ] Add STRIPE_WEBHOOK_SECRET to backend .env
@@ -196,13 +237,20 @@
 ## Known Issues
 
 ### Backend
+
 - [ ] Console print statements in webhook handler (debugging)
 - [ ] No email receipt on payment success
 - [ ] No invoice PDF generation
 - [ ] No refund API endpoint
 - [ ] Transaction created even for failed payments (should only log attempts)
 
+### Frontend
+
+- [ ] Dashboard is a placeholder - needs enrolled courses display
+- [ ] No loading skeleton for order summary during initial load
+
 ### Missing Features
+
 - [ ] Cart functionality (multi-course purchase)
 - [ ] Discount/promo codes
 - [ ] Subscription billing
@@ -215,8 +263,9 @@
 ---
 
 ## Documentation Tasks
+
 - [x] API endpoint documentation
 - [x] Payment flow documentation
-- [ ] Frontend integration guide (pending implementation)
+- [x] TanStack Query architecture documentation
 - [ ] Webhook setup guide
 - [ ] Testing guide

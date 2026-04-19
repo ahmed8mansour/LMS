@@ -1,6 +1,6 @@
 "use client"
 import CourseSections from "./CourseSections";
-import CourseEnrollCard from "./CourseEnrollCard";
+import CourseEnrollCard from "../../../../enrollment/components/CourseEnrollCard";
 import CourseHero from "./CourseHero";
 import CourseGoals from "./CourseGoals";
 import CourseInstructor from "./CourseInstructor";
