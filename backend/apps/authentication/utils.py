@@ -220,6 +220,8 @@ def send_otp_email(user, otp_code, purpose='registration'):
     subject_map = {
         'registration': 'Verify Your Email - OTP Code',
         'password_reset': 'Reset Your Password - OTP Code',
+        'forget_password': 'Reset Your Password - OTP Code',
+        'google_set_password': 'Set Your Password - OTP Code',
         'login': 'Two-Factor Authentication - OTP Code',
     }
     

@@ -21,35 +21,35 @@ This document catalogs the patterns, naming conventions, file structures, and ap
 
 ### Backend (Python/Django)
 
-| Element | Convention | Example |
-|---------|------------|---------|
-| **Classes** | PascalCase, descriptive | `CustomUser`, `InstructorProfile`, `CourseSerializer` |
-| **Model Classes** | PascalCase, singular noun | `Course`, `Section`, `Lecture` |
-| **Serializer Classes** | PascalCase + "Serializer" suffix | `CourseSerializer`, `UserDataSerializer` |
-| **View Classes** | PascalCase + "View" suffix | `UserLoginView`, `StudentCourseViewSet` |
-| **Permission Classes** | PascalCase + descriptive | `isAdmin`, `isInstructor` |
-| **Functions/Methods** | snake_case | `get_queryset()`, `create_otp()` |
-| **Variables** | snake_case | `user_data`, `course_id` |
-| **Fields (DB)** | snake_case | `profile_picture`, `subscribers_count` |
-| **Files** | snake_case | `models.py`, `serializers.py` |
-| **URL Names** | snake_case | `'user_login'`, `'create_intent'` |
-| **Constants (settings)** | UPPER_CASE | `JWT_COOKIE_SETTINGS`, `OTP_EXPIRY_MINUTES` |
+| Element                  | Convention                       | Example                                               |
+| ------------------------ | -------------------------------- | ----------------------------------------------------- |
+| **Classes**              | PascalCase, descriptive          | `CustomUser`, `InstructorProfile`, `CourseSerializer` |
+| **Model Classes**        | PascalCase, singular noun        | `Course`, `Section`, `Lecture`                        |
+| **Serializer Classes**   | PascalCase + "Serializer" suffix | `CourseSerializer`, `UserDataSerializer`              |
+| **View Classes**         | PascalCase + "View" suffix       | `UserLoginView`, `StudentCourseViewSet`               |
+| **Permission Classes**   | PascalCase + descriptive         | `isAdmin`, `isInstructor`                             |
+| **Functions/Methods**    | snake_case                       | `get_queryset()`, `create_otp()`                      |
+| **Variables**            | snake_case                       | `user_data`, `course_id`                              |
+| **Fields (DB)**          | snake_case                       | `profile_picture`, `subscribers_count`                |
+| **Files**                | snake_case                       | `models.py`, `serializers.py`                         |
+| **URL Names**            | snake_case                       | `'user_login'`, `'create_intent'`                     |
+| **Constants (settings)** | UPPER_CASE                       | `JWT_COOKIE_SETTINGS`, `OTP_EXPIRY_MINUTES`           |
 
 ### Frontend (TypeScript/React)
 
-| Element | Convention | Example |
-|---------|------------|---------|
-| **Components** | PascalCase | `LoginForm`, `CourseCard`, `UserAvatar` |
-| **Component Files** | PascalCase for components | `LoginForm.tsx`, `CourseCard.tsx` |
-| **Hook Files** | camelCase with "use" prefix | `useLogin.tsx`, `useCourse.tsx` |
-| **Hook Functions** | camelCase with "use" prefix | `useLogin()`, `usePaginatedCourses()` |
-| **Type/Interface** | PascalCase | `Course`, `UserData`, `LoginFormData` |
-| **Variables** | camelCase | `userData`, `courseId`, `isLoading` |
-| **Functions** | camelCase | `handleSubmit()`, `getCourses()` |
-| **API Objects** | camelCase + "API" suffix | `authAPI`, `coursesAPI` |
-| **Schema Objects** | PascalCase + "Schema" suffix | `registerSchema`, `LoginSchema` |
-| **Store Files** | camelCase + ".store.ts" | `auth.store.ts` |
-| **Store Hooks** | camelCase + "use" + Store | `useAuthStore` |
+| Element             | Convention                   | Example                                 |
+| ------------------- | ---------------------------- | --------------------------------------- |
+| **Components**      | PascalCase                   | `LoginForm`, `CourseCard`, `UserAvatar` |
+| **Component Files** | PascalCase for components    | `LoginForm.tsx`, `CourseCard.tsx`       |
+| **Hook Files**      | camelCase with "use" prefix  | `useLogin.tsx`, `useCourse.tsx`         |
+| **Hook Functions**  | camelCase with "use" prefix  | `useLogin()`, `usePaginatedCourses()`   |
+| **Type/Interface**  | PascalCase                   | `Course`, `UserData`, `LoginFormData`   |
+| **Variables**       | camelCase                    | `userData`, `courseId`, `isLoading`     |
+| **Functions**       | camelCase                    | `handleSubmit()`, `getCourses()`        |
+| **API Objects**     | camelCase + "API" suffix     | `authAPI`, `coursesAPI`                 |
+| **Schema Objects**  | PascalCase + "Schema" suffix | `registerSchema`, `LoginSchema`         |
+| **Store Files**     | camelCase + ".store.ts"      | `auth.store.ts`                         |
+| **Store Hooks**     | camelCase + "use" + Store    | `useAuthStore`                          |
 
 ### File Naming Exceptions
 
@@ -146,8 +146,8 @@ front-end/src/
 
 ### Import Path Aliases
 
-| Alias | Path |
-|-------|------|
+| Alias | Path    |
+| ----- | ------- |
 | `@/*` | `src/*` |
 
 ---
@@ -159,6 +159,7 @@ front-end/src/
 The backend uses **three view patterns** based on use case:
 
 #### 1. ModelViewSet (CRUD Resources)
+
 For role-based CRUD operations on entities.
 
 ```python
@@ -173,17 +174,18 @@ class InstructorCourseViewSet(ModelViewSet):
     serializer_class = CourseSerializer
     authentication_classes = [CookieJWTAuthentication]
     permission_classes = [IsAuthenticated, isInstructor]
-    
+
     def get_queryset(self):
         # Filter to user's own resources
         return Course.objects.filter(instructor=self.request.user.instructor_profile)
-    
+
     def perform_create(self, serializer):
         # Auto-assign ownership
         serializer.save(instructor=self.request.user.instructor_profile)
 ```
 
 #### 2. ReadOnlyModelViewSet (Public/Student Views)
+
 For read-only access with filtering.
 
 ```python
@@ -194,7 +196,7 @@ class StudentCourseViewSet(ReadOnlyModelViewSet):
     search_fields = ['title', 'description', 'instructor__title']
     pagination_class = CourseCursorPagination
     authentication_classes = [CookieJWTAuthentication]
-    
+
     def get_queryset(self):
         # Manual filtering
         queryset = Course.objects.all()
@@ -205,13 +207,14 @@ class StudentCourseViewSet(ReadOnlyModelViewSet):
 ```
 
 #### 3. APIView (Custom Endpoints)
+
 For complex operations, actions, or workflows.
 
 ```python
 class CreatePaymentIntentView(APIView):
     authentication_classes = [CookieJWTAuthentication]
     permission_classes = [IsAuthenticated]
-    
+
     def post(self, request):
         serializer = CreatePaymentSerializer(data=request.data, context={'request': request})
         if not serializer.is_valid():
@@ -241,6 +244,7 @@ urlpatterns = [
 ### Serializer Patterns
 
 #### ModelSerializer (Standard)
+
 ```python
 class QuizSerializer(serializers.ModelSerializer):
     class Meta:
@@ -249,17 +253,18 @@ class QuizSerializer(serializers.ModelSerializer):
 ```
 
 #### Nested Serialization with `to_representation`
+
 ```python
 class SectionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Section
         fields = '__all__'
-    
+
     def to_representation(self, instance):
         # Add nested data
         lectures = Lecture.objects.filter(section=instance).order_by('order')
         quiz = Quiz.objects.filter(section=instance).first()
-        
+
         section_data = super().to_representation(instance)
         section_data['lectures'] = LectureSerializer(lectures, many=True).data
         section_data['quiz'] = QuizSerializer(quiz).data if quiz else None
@@ -267,14 +272,15 @@ class SectionSerializer(serializers.ModelSerializer):
 ```
 
 #### SerializerMethodField for Computed Data
+
 ```python
 class CourseSerializer(serializers.ModelSerializer):
     instructor_profile = serializers.SerializerMethodField()
-    
+
     class Meta:
         model = Course
         fields = [..., 'instructor_profile']
-    
+
     def get_instructor_profile(self, obj):
         try:
             instructor = obj.instructor.user
@@ -284,10 +290,11 @@ class CourseSerializer(serializers.ModelSerializer):
 ```
 
 #### Validation in Serializers
+
 ```python
 class UserResnedOTPSerializer(serializers.Serializer):
     email = serializers.EmailField()
-    
+
     def validate(self, data):
         email = data.get('email')
         try:
@@ -332,83 +339,87 @@ class MyView(APIView):
 
 ```typescript
 // features/{feature}/api/{feature}.api.ts
-import axios from '@/lib/axios';
-import { TypeName } from '../types/{feature}.types';
+import axios from "@/lib/axios";
+import { TypeName } from "../types/{feature}.types";
 
 async function functionName(requestBody: RequestType): Promise<ResponseType> {
-    const { data } = await axios.post("/endpoint/path/", requestBody);
-    return data;
+  const { data } = await axios.post("/endpoint/path/", requestBody);
+  return data;
 }
 
 async function functionWithParams(id: string): Promise<ResponseType> {
-    const { data } = await axios.get(`endpoint/path/${id}/`);
-    return data;
+  const { data } = await axios.get(`endpoint/path/${id}/`);
+  return data;
 }
 
 // Export as object
 export const featureAPI = {
-    functionName,
-    functionWithParams,
-    // ...
+  functionName,
+  functionWithParams,
+  // ...
 };
 ```
 
 ### React Query Hook Patterns
 
 #### Mutation Hook (POST/PUT/DELETE)
+
 ```typescript
 // features/{feature}/hooks/use{Action}.tsx
-import { useMutation } from '@tanstack/react-query';
-import { featureAPI } from '../api/feature.api';
-import { toastsuccess, handleAuthError } from '@/lib/toast';
+import { useMutation } from "@tanstack/react-query";
+import { featureAPI } from "../api/feature.api";
+import { toastsuccess, handleAuthError } from "@/lib/toast";
 
 export function useAction() {
-    return useMutation({
-        mutationFn: featureAPI.apiFunction,
-        onSuccess(data: any) {
-            toastsuccess('Success Title', data.message);
-        },
-        onError(error: any) {
-            handleAuthError(error, 'Action Failed');
-        },
-    });
+  return useMutation({
+    mutationFn: featureAPI.apiFunction,
+    onSuccess(data: any) {
+      toastsuccess("Success Title", data.message);
+    },
+    onError(error: any) {
+      handleAuthError(error, "Action Failed");
+    },
+  });
 }
 ```
 
 #### Query Hook (GET with params)
+
 ```typescript
 // features/{feature}/hooks/use{Resource}.tsx
-import { useQuery } from '@tanstack/react-query';
-import { featureAPI } from '../api/feature.api';
+import { useQuery } from "@tanstack/react-query";
+import { featureAPI } from "../api/feature.api";
 
 export function useResource(id: string) {
-    return useQuery({
-        queryKey: ['resource', id],
-        queryFn: () => featureAPI.getResource(id),
-        staleTime: 5 * 60 * 1000, // 5 minutes
-    });
+  return useQuery({
+    queryKey: ["resource", id],
+    queryFn: () => featureAPI.getResource(id),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
 }
 ```
 
 #### Infinite Query Hook (Pagination)
+
 ```typescript
 // features/{feature}/hooks/usePaginated{Resource}.tsx
-import { useInfiniteQuery } from '@tanstack/react-query';
-import { featureAPI } from '../api/feature.api';
-import { FilterParams } from '../types/feature.types';
+import { useInfiniteQuery } from "@tanstack/react-query";
+import { featureAPI } from "../api/feature.api";
+import { FilterParams } from "../types/feature.types";
 
 export function usePaginatedResources(params: FilterParams) {
-    return useInfiniteQuery({
-        queryKey: ['resources', params],
-        queryFn: ({ pageParam }) => featureAPI.getResources({ ...params, cursor: pageParam }),
-        initialPageParam: '',
-        getNextPageParam: (lastPage) => {
-            if (!lastPage.next) return null;
-            const cursor = new URL(lastPage.next).searchParams.get('cursor');
-            return cursor;
-        },
-        staleTime: 5 * 60 * 1000,
-    });
+  return useInfiniteQuery({
+    queryKey: ["resources", params],
+    queryFn: ({ pageParam }) =>
+      featureAPI.getResources({ ...params, cursor: pageParam }),
+    initialPageParam: "",
+    getNextPageParam: (lastPage) => {
+      if (!lastPage.next) return null;
+      const cursor = new URL(lastPage.next).searchParams.get("cursor");
+      return cursor;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
 }
 ```
 
@@ -416,17 +427,19 @@ export function usePaginatedResources(params: FilterParams) {
 
 ```typescript
 // features/{feature}/schemas/{feature}.schma.ts
-import { z } from 'zod';
+import { z } from "zod";
 
-export const schemaName = z.object({
-    field: z.string().min(3, 'Error message'),
-    email: z.string().email('Invalid email'),
-    role: z.enum(['student', 'instructor']),
+export const schemaName = z
+  .object({
+    field: z.string().min(3, "Error message"),
+    email: z.string().email("Invalid email"),
+    role: z.enum(["student", "instructor"]),
     confirm: z.string(),
-}).refine((data) => data.password === data.confirm, {
+  })
+  .refine((data) => data.password === data.confirm, {
     message: "Passwords don't match",
     path: ["confirm"],
-});
+  });
 
 // Export inferred type
 export type SchemaFormData = z.infer<typeof schemaName>;
@@ -442,22 +455,22 @@ import { SchemaName, SchemaFormData } from "../schemas/feature.schma";
 import { useAction } from "../hooks/useAction";
 
 export function FormComponent() {
-    const { register, handleSubmit, formState: { errors } } = 
+    const { register, handleSubmit, formState: { errors } } =
         useForm<SchemaFormData>({ resolver: zodResolver(SchemaName) });
-    
+
     const { mutate: actionName, isPending } = useAction();
-    
+
     const onSubmit: SubmitHandler<SchemaFormData> = (data) => {
         actionName(data, {
             onSuccess() {
-                router.push("/next-page");
+                router.replace("/next-page");
             },
             onError(error) {
                 // Handle specific error
             },
         });
     };
-    
+
     return (
         <form onSubmit={handleSubmit(onSubmit)}>
             <input {...register('field')} />
@@ -482,7 +495,7 @@ class MyView(APIView):
         serializer = MySerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        
+
         try:
             with transaction.atomic():
                 # ... database operations
@@ -497,14 +510,15 @@ class MyView(APIView):
                 {'error': 'Something went wrong'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-        
+
         return Response({'message': 'Success'}, status=status.HTTP_200_OK)
 ```
 
 Error response format:
+
 ```json
 {
-  "error": "Error message string" 
+  "error": "Error message string"
 }
 // OR for serializer errors:
 {
@@ -515,6 +529,7 @@ Error response format:
 ### Frontend Error Pattern
 
 #### Toast Utility
+
 ```typescript
 // lib/toast.tsx
 import { toast } from "sonner";
@@ -540,59 +555,60 @@ export function handleAuthError(error: any, fallbackHead: string = 'Authenticati
         toasterror('Network Error', "Can't connect to server");
         return;
     }
-    
+
     const message = error.response.data?.error || error.response.data?.detail || 'Something went wrong';
-    const displayMessage = typeof message === 'string' 
-        ? message 
-        : Array.isArray(message) 
-            ? message.join('\n') 
+    const displayMessage = typeof message === 'string'
+        ? message
+        : Array.isArray(message)
+            ? message.join('\n')
             : 'Something went wrong';
-    
+
     toasterror(fallbackHead, displayMessage);
 }
 ```
 
 #### Axios Interceptor Pattern
+
 ```typescript
 // lib/axios.ts
 axiosInstance.interceptors.response.use(
-    (response) => response,
-    async (error) => {
-        const originalRequest = error.config;
-        
-        if (!error.response) return Promise.reject(error);
-        if (error.response.status !== 401) return Promise.reject(error);
-        
-        // Prevent infinite loops
-        if (originalRequest.url.includes("/auth/token/refresh/")) {
-            return Promise.reject(error);
-        }
-        if (originalRequest._retry) {
-            return Promise.reject(error);
-        }
-        
-        originalRequest._retry = true;
-        
-        // Token refresh logic with queue
-        if (isRefreshing) {
-            return new Promise((resolve) => {
-                subscribeTokenRefresh(() => {
-                    resolve(axiosInstance(originalRequest));
-                });
-            });
-        }
-        
-        isRefreshing = true;
-        try {
-            await axiosInstance.post("/auth/token/refresh/");
-            isRefreshing = false;
-            onRefreshed();
-            return axiosInstance(originalRequest);
-        } catch (refreshError) {
-            isRefreshing = false;
-            return Promise.reject(refreshError);
-        }
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+
+    if (!error.response) return Promise.reject(error);
+    if (error.response.status !== 401) return Promise.reject(error);
+
+    // Prevent infinite loops
+    if (originalRequest.url.includes("/auth/token/refresh/")) {
+      return Promise.reject(error);
     }
+    if (originalRequest._retry) {
+      return Promise.reject(error);
+    }
+
+    originalRequest._retry = true;
+
+    // Token refresh logic with queue
+    if (isRefreshing) {
+      return new Promise((resolve) => {
+        subscribeTokenRefresh(() => {
+          resolve(axiosInstance(originalRequest));
+        });
+      });
+    }
+
+    isRefreshing = true;
+    try {
+      await axiosInstance.post("/auth/token/refresh/");
+      isRefreshing = false;
+      onRefreshed();
+      return axiosInstance(originalRequest);
+    } catch (refreshError) {
+      isRefreshing = false;
+      return Promise.reject(refreshError);
+    }
+  },
 );
 ```
 
@@ -604,40 +620,41 @@ axiosInstance.interceptors.response.use(
 
 ```typescript
 // store/{feature}.store.ts
-import { create } from 'zustand';
+import { create } from "zustand";
 
 type StoreState = {
-    // State
-    fieldName: string | null;
-    booleanFlag: boolean;
-    
-    // Actions
-    setFieldName: (value: string | null) => void;
-    setBooleanFlag: (value: boolean) => void;
+  // State
+  fieldName: string | null;
+  booleanFlag: boolean;
+
+  // Actions
+  setFieldName: (value: string | null) => void;
+  setBooleanFlag: (value: boolean) => void;
 };
 
 export const useFeatureStore = create<StoreState>((set) => ({
-    fieldName: null,
-    booleanFlag: false,
-    
-    setFieldName: (fieldName) => {
-        set({ fieldName, booleanFlag: true });
-    },
-    setBooleanFlag: (value) => set({ booleanFlag: value }),
+  fieldName: null,
+  booleanFlag: false,
+
+  setFieldName: (fieldName) => {
+    set({ fieldName, booleanFlag: true });
+  },
+  setBooleanFlag: (value) => set({ booleanFlag: value }),
 }));
 ```
 
 ### Store Usage Pattern
+
 ```typescript
 // In component
-import { useAuthStore } from '@/store/auth.store';
+import { useAuthStore } from "@/store/auth.store";
 
 export function Component() {
-    const setPendingEmail = useAuthStore((store) => store.setPendingEmail);
-    const pendingEmail = useAuthStore((store) => store.pendingEmail);
-    
-    // Or get all at once
-    const { pendingEmail, setPendingEmail } = useAuthStore();
+  const setPendingEmail = useAuthStore((store) => store.setPendingEmail);
+  const pendingEmail = useAuthStore((store) => store.pendingEmail);
+
+  // Or get all at once
+  const { pendingEmail, setPendingEmail } = useAuthStore();
 }
 ```
 
@@ -647,13 +664,14 @@ export function Component() {
 
 ### Atomic Design Structure
 
-| Level | Location | Responsibility | Examples |
-|-------|----------|--------------|----------|
-| **Atoms** | `components/atoms/` | Basic UI primitives | `button.tsx`, `input.tsx` |
+| Level         | Location                | Responsibility       | Examples                        |
+| ------------- | ----------------------- | -------------------- | ------------------------------- |
+| **Atoms**     | `components/atoms/`     | Basic UI primitives  | `button.tsx`, `input.tsx`       |
 | **Molecules** | `components/molecules/` | Composite components | `CourseCard.tsx`, `Filters.tsx` |
-| **Organisms** | `components/organisms/` | Page sections | `NavBar.tsx`, `Hero.tsx` |
+| **Organisms** | `components/organisms/` | Page sections        | `NavBar.tsx`, `Hero.tsx`        |
 
 ### Component File Pattern
+
 ```typescript
 "use client"; // For client components
 
@@ -663,7 +681,7 @@ import { Component } from "@/components/atoms/component";
 // Named export
 export function ComponentName({ prop1, prop2 }: PropsType) {
     const { mutate, isPending } = useHook();
-    
+
     return (
         <div className="tailwind-classes">
             {/* JSX */}
@@ -673,6 +691,7 @@ export function ComponentName({ prop1, prop2 }: PropsType) {
 ```
 
 ### Feature Component Pattern
+
 ```typescript
 // features/{feature}/components/{Feature}{Component}.tsx
 "use client";
@@ -685,14 +704,15 @@ interface ComponentProps {
 
 export function FeatureComponent({ id }: ComponentProps) {
     const { data, isLoading } = useHook(id);
-    
+
     if (isLoading) return <Skeleton />;
-    
+
     return <div>{/* render */}</div>;
 }
 ```
 
 ### Loading Pattern
+
 ```typescript
 // Use loading.tsx for route-level loading
 export default function Loading() {
@@ -711,28 +731,31 @@ export default function Loading() {
 ### Tailwind CSS Patterns
 
 #### Custom Colors (via CSS Variables)
+
 ```css
 /* globals.css */
 @theme inline {
-    --color-darktext: #0F172A;
-    --color-graytext2: #64748B;
-    --color-darkmint: #2B5869;
-    --color-lightbg: #F8FAFC;
-    --color-darkbg: #F1F5F9;
+  --color-darktext: #0f172a;
+  --color-graytext2: #64748b;
+  --color-darkmint: #2b5869;
+  --color-lightbg: #f8fafc;
+  --color-darkbg: #f1f5f9;
 }
 ```
 
 #### Component Usage
+
 ```tsx
 // Use custom colors via class names
 <div className="text-darktext bg-lightbg">
-    <button className="bg-darkmint text-white hover:bg-darkmint/90">
-        Click me
-    </button>
+  <button className="bg-darkmint text-white hover:bg-darkmint/90">
+    Click me
+  </button>
 </div>
 ```
 
 #### Responsive Pattern
+
 ```tsx
 // Mobile-first approach
 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -745,7 +768,9 @@ export default function Loading() {
 ```
 
 #### Spacing Scale
+
 Use Tailwind's default spacing (4px base):
+
 - `gap-2` = 8px
 - `gap-4` = 16px
 - `gap-6` = 24px
@@ -758,12 +783,13 @@ Use Tailwind's default spacing (4px base):
 ## Pagination Pattern (Cursor-Based)
 
 ### Backend
+
 ```python
 class CourseCursorPagination(CursorPagination):
     page_size = 1
     page_size_query_param = 'page_size'
     ordering = ('-created_at',)
-    
+
     def get_ordering(self, request, queryset, view):
         sort = request.query_params.get('sort', 'newest')
         allowed_orderings = {
@@ -775,15 +801,16 @@ class CourseCursorPagination(CursorPagination):
 ```
 
 ### Frontend
+
 ```typescript
 const { data, fetchNextPage, hasNextPage } = useInfiniteQuery({
-    queryKey: ['courses', filters],
-    queryFn: ({ pageParam }) => api.getCourses({ ...filters, cursor: pageParam }),
-    initialPageParam: '',
-    getNextPageParam: (lastPage) => {
-        if (!lastPage.next) return null;
-        return new URL(lastPage.next).searchParams.get('cursor');
-    },
+  queryKey: ["courses", filters],
+  queryFn: ({ pageParam }) => api.getCourses({ ...filters, cursor: pageParam }),
+  initialPageParam: "",
+  getNextPageParam: (lastPage) => {
+    if (!lastPage.next) return null;
+    return new URL(lastPage.next).searchParams.get("cursor");
+  },
 });
 ```
 

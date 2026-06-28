@@ -25,12 +25,12 @@ export function LoginForm() {
         console.log(data)
         userLogin(data , {
             onSuccess(data) {
-                router.push("/")
+                router.replace("/")
             },
             onError(error) {
                 const message = error.response?.data?.error?.join('\n');
                 if (message === "Account is disabled. Please verify your email.") {
-                    router.push('/verifyotp/')
+                    router.replace('/verifyotp/')
                 }
             },
         })

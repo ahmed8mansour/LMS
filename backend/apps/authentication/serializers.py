@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 import requests
 from django.conf import settings
+from cloudinary.utils import cloudinary_url
 from allauth.socialaccount.models import SocialAccount
 from django.contrib.auth import authenticate
 from rest_framework import status
@@ -32,6 +33,7 @@ class AdminProfileSerializer(serializers.ModelSerializer):
 
 class UserDataSerializer(serializers.ModelSerializer):
     specific_data = serializers.SerializerMethodField()
+    has_usable_password = serializers.SerializerMethodField()
     
     
     class Meta:
@@ -41,6 +43,11 @@ class UserDataSerializer(serializers.ModelSerializer):
             'password': {'write_only': True}
         }
     
+    def get_has_usable_password(self , obj):
+        return obj.has_usable_password()
+
+
+
     def get_specific_data(self, obj):
         """Return the appropriate profile based on user role"""
         if obj.role == 'student':
@@ -703,19 +710,17 @@ class GoogleSetPasswordVerifyOTPSerializer(serializers.Serializer):
         user = self.validated_data['user']
         otp = self.validated_data['otp']
 
-        # Set authorization flag to allow password change
-        user.can_change_password = True
-        user.save()
-        
         # Mark OTP as used
         otp.is_used = True
         otp.save()
 
+        reset_token = PasswordResetToken.create_token(user=user)
+        self.context['reset_token'] = reset_token
+
         return {
             'message': 'OTP verified successfully. You can now set your password.',
             'email': user.email,
-            'can_change_password': True,
-            'next_step': 'set_password'
+            'next_step': 'set_new_password'
         }
 
 
@@ -729,30 +734,41 @@ class GoogleSetPasswordNewPasswordSerializer(serializers.Serializer):
     }
     """
     new_password = serializers.CharField(write_only=True, style={'input_type': 'password'})
-    new_password_confirm = serializers.CharField(write_only=True, style={'input_type': 'password'})
 
     def validate(self, data):
         user = self.context.get('request').user
         new_password = data.get('new_password')
-        new_password_confirm = data.get('new_password_confirm')
-        
-        if new_password != new_password_confirm:
-            raise serializers.ValidationError({
-                'new_password_confirm': 'Passwords do not match'
-            })
-        
-        if not user.can_change_password:
-            raise serializers.ValidationError({
-                'error': 'Please verify the OTP sent to your email first'
-            })
+
         
         if user.has_usable_password():
             raise serializers.ValidationError({
                 'error': 'This user has already set a password'
             })
 
+        reset_token = self.context.get('reset_token')
+        if not reset_token:
+            raise serializers.ValidationError({
+                'error': 'Password reset authorization is missing. Please verify your OTP first.'
+            })
+
+        try:
+            token_obj = PasswordResetToken.objects.select_related('user').get(
+                token=reset_token,
+                is_used=False
+            )
+        except PasswordResetToken.DoesNotExist:
+            raise serializers.ValidationError({
+                'error': 'Invalid or expired password reset token.'
+            })
+
+        if not token_obj.is_valid() or token_obj.user != user:
+            raise serializers.ValidationError({
+                'error': 'Invalid or expired password reset token.'
+            })
+
         data['user'] = user
         data['new_password'] = new_password
+        data['reset_token'] = token_obj
         return data
     
     def save(self, **kwargs):

@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import (UserRegisterSendOTPView , 
+from .views import (CloudinarySignatureView, UserRegisterSendOTPView , 
                     UserLogoutView , UserProfileView
                     , UserProfileUpdateView ,GoogleLoginAPIView , GoogleRegisterAPIView , 
                     UserLoginView , UserSetPasswordView , 
@@ -32,7 +32,8 @@ urlpatterns = [
 
     path('user/profile/' , UserProfileView.as_view() , name="user_profile"),
     path('user/update/' , UserProfileUpdateView.as_view() , name="user_update_profile"),
-    path('user/changepassword/' , UserChangePasswordView.as_view() , name="google_changepassword"),
+    path('user/changepassword/' , UserChangePasswordView.as_view() , name="user_changepassword"),
+    path('user/getCloudinarySignature/' , CloudinarySignatureView.as_view() , name="user_getcloudinarysignature"),
     
 
 

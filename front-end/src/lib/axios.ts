@@ -1,12 +1,4 @@
 import axios from 'axios';
-import { authAPI } from '@/featuers/auth';
-
-// const PUBLIC_ENDPOINTS = [
-//     '/auth/user/register/',
-//     '/auth/user/login/',
-//     '/auth/user/register/verifyOTP/',
-// ];
-
 
 
 const axiosInstance = axios.create({
@@ -87,5 +79,11 @@ axiosInstance.interceptors.response.use(
     }
 );
 
+axiosInstance.interceptors.request.use((config) => {
+    if (config.data instanceof FormData) {
+        delete config.headers['Content-Type']; 
+    }
+    return config;
+});
 
 export default axiosInstance;

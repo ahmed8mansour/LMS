@@ -42,30 +42,31 @@ export default function CourseCard({ course }: CourseCardProps) {
 
     return (
         <div className="group overflow-hidden rounded-xl p-4 border border-graytext/20 shadow-lg transition-all duration-300 hover:-translate-y-2 bg-white cursor-pointer">
-            <Link href={`/courses/${id}`}>
-                {/* Preview Area */}
-                <div className="relative h-56 bg-gradient-to-br from-darkmint/80 via-darkmint to-darkmint/60 p-6 rounded-2xl overflow-hidden">
+            {/* Preview Area */}
+            <div className="relative h-56 bg-gradient-to-br from-darkmint/80 via-darkmint to-darkmint/60 p-6 rounded-2xl overflow-hidden">
+                <Link href={`/courses/${id}`}>
                     <Image
                         src={thumbnail}
                         alt={title}
                         fill
                         className="object-cover w-full h-full transform transition-transform duration-300 group-hover:scale-105 rounded-2xl"
                     />
-                    {category && (
-                        <div className="absolute z-10 w-fit h-6 py-1 px-2 bg-white rounded-[4px] text-darkmint left-3 top-3 uppercase font-extrabold text-[10px]">
-                            {category}
-                        </div>
-                    )}
-                    {enrolled_status && (
-                        <div className="absolute z-10 w-fit h-6 py-1 px-2 bg-darkmint rounded-[4px] text-white right-3 top-3 uppercase font-extrabold text-[10px] flex items-center gap-1">
-                            <Play size={10} />
-                            Enrolled
-                        </div>
-                    )}
-                </div>
+                </Link>
+                {category && (
+                    <div className="absolute z-10 w-fit h-6 py-1 px-2 bg-white rounded-[4px] text-darkmint left-3 top-3 uppercase font-extrabold text-[10px]">
+                        {category}
+                    </div>
+                )}
+                {enrolled_status && (
+                    <div className="absolute z-10 w-fit h-6 py-1 px-2 bg-darkmint rounded-[4px] text-white right-3 top-3 uppercase font-extrabold text-[10px] flex items-center gap-1">
+                        <Play size={10} />
+                        Enrolled
+                    </div>
+                )}
+            </div>
 
-                {/* Content Area */}
-                <div className="space-y-4 py-5">
+            {/* Content Area */}
+            <div className="space-y-4 py-5">
                     <div className="space-y-2">
                         <div className="flex items-center justify-between">
                             <h3 className="text-lg font-bold text-darktext group-hover:text-darkmint">
@@ -114,7 +115,6 @@ export default function CourseCard({ course }: CourseCardProps) {
                         </Button>
                     </div>
                 </div>
-            </Link>
         </div>
     );
 }

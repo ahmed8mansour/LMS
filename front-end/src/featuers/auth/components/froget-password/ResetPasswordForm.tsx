@@ -9,21 +9,39 @@ import { useRouter } from "next/navigation";
 import ButtonLoading from "@/components/atoms/buttonloading";
 import { FaArrowRight } from "react-icons/fa";
 import { useResetPassword } from "../../hooks/forget-password/useResetPassword";
+import { useGoogleSetPasswordReset } from "../../hooks/forget-password/useGoogleSetPasswordReset";
 
-export function ResetPasswordForm() {
+interface ResetPasswordFormProps {
+    mode?: 'forget_password' | 'google_set_password';
+    onSuccessPath?: string;
+}
+
+export function ResetPasswordForm({ mode = 'forget_password', onSuccessPath }: ResetPasswordFormProps) {
     const router = useRouter()
     const { register, handleSubmit, formState: { errors } } = useForm<ForgetPassResetFormData>({
         resolver: zodResolver(ForgetPassResetSchema)
     })
-    const { isPending, mutate: resetPassword } = useResetPassword()
+    const { isPending: isForgetPending, mutate: resetForgetPassword } = useResetPassword()
+    const { isPending: isGooglePending, mutate: resetGooglePassword } = useGoogleSetPasswordReset()
+    const isPending = isForgetPending || isGooglePending
 
     const onSubmit: SubmitHandler<ForgetPassResetFormData> = (data) => {
-        resetPassword({new_password: data.password}, {
-            onSuccess(data){
-                router.push('/')
+        const payload = { new_password: data.password }
+
+        if (mode === 'google_set_password') {
+            resetGooglePassword(payload, {
+                onSuccess() {
+                    router.replace(onSuccessPath ?? '/dashboard')
+                }
+            })
+            return
+        }
+
+        resetForgetPassword(payload, {
+            onSuccess() {
+                router.replace(onSuccessPath ?? '/')
             }
-        })    
-    
+        })
     }
 
     return (

@@ -1,14 +1,16 @@
 from rest_framework import serializers
 
-from apps.course.serializers import CourseSerializer
 from apps.course.models import Lecture , Section , Quiz , Question , Choice , Course
 
 from apps.authentication.models import CustomUser
 from apps.authentication.serializers import UserDataSerializer
+
+
 # ==================================================
 # 1- urls: 
 # progress/student/overview/
 # progress/student/courses/
+
 class CourseOverviewSerializer(serializers.Serializer):
     id     = serializers.CharField(source='course.id')
     title     = serializers.CharField(source='course.title')
@@ -16,7 +18,10 @@ class CourseOverviewSerializer(serializers.Serializer):
     category  = serializers.CharField(source='course.category')
     progress  = serializers.FloatField()
     instructor_firstname = serializers.CharField(source='course.instructor.user.first_name')
-    instructor_last_name = serializers.CharField(source='course.instructor.user.last_name')
+    instructor_lastname = serializers.CharField(source='course.instructor.user.last_name')
+    instructor_avatar = serializers.ImageField(source='course.instructor.user.profile_picture')
+    total_lectures = serializers.IntegerField()
+    lectures_completed = serializers.IntegerField()
 
 
 
@@ -96,13 +101,11 @@ class SectionProgressSerializer(serializers.ModelSerializer):
         quiz = getattr(obj, 'quiz', None)
         if not quiz:
             return None
-        completed_ids   = self.context.get('completed_lecture_ids', set())
-        section_ids     = set(obj.lectures.values_list('id', flat=True))
-        all_completed   = section_ids.issubset(completed_ids)
         passed_quiz_ids = self.context.get('passed_quiz_ids', set())
+        unlocked_quiz_ids = self.context.get('unlocked_quiz_ids', set())
         return QuizProgressSerializer(quiz, context={
             'is_passed': quiz.id in passed_quiz_ids,
-            'is_unlocked': all_completed,
+            'is_unlocked': quiz.id in unlocked_quiz_ids,
         }).data
     
     def to_representation(self, instance):
@@ -133,7 +136,6 @@ class EnrolledCourseDataSerializer(serializers.ModelSerializer):
     def get_instructor_profile(self , obj):
         try : 
             instructor = obj.instructor.user
-            
             return UserDataSerializer(instructor).data
         except CustomUser.DoesNotExist:
             return None
@@ -244,4 +246,4 @@ class QuizDataSerializer(serializers.ModelSerializer):
     
     def get_passed(self , obj):
         return self.context['passed']
-    
+

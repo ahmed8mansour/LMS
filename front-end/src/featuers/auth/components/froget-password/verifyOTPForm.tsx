@@ -18,21 +18,42 @@ import { useRouter } from "next/navigation";
 import Cookies from "js-cookie";
 import ButtonLoading from "@/components/atoms/buttonloading";
 import { useForgetPasswordVerifyOTP } from "../../hooks/forget-password/useVerifyOTP"
+import { useGoogleSetPasswordVerifyOTP } from "../../hooks/forget-password/useGoogleSetPasswordVerifyOTP"
 
-export function FPverifyOTPForm() {
+interface FPverifyOTPFormProps {
+    mode?: 'forget_password' | 'google_set_password';
+    onSuccessPath?: string;
+}
+
+export function FPverifyOTPForm({ mode = 'forget_password', onSuccessPath }: FPverifyOTPFormProps) {
     const router = useRouter()
     const pendingEmail = Cookies.get('FG_email')
     const { handleSubmit, control , formState:{errors}} = useForm<otpFormData>({resolver:zodResolver(OTPSchema)})
-    const {mutate:useVerify , isSuccess:isVerified , isPending:isVerifing } = useForgetPasswordVerifyOTP()
-    // const {mutate:useResend , isSuccess:isResent, isPending:isResending } = useRegisterResendOTP()
+    const isGoogleMode = mode === 'google_set_password'
+    const {mutate: verifyForgetOTP , isPending:isForgetVerifying } = useForgetPasswordVerifyOTP()
+    const {mutate: verifyGoogleOTP , isPending:isGoogleVerifying } = useGoogleSetPasswordVerifyOTP()
+    const isVerifing = isForgetVerifying || isGoogleVerifying
     
     const verifyOTP: SubmitHandler<otpFormData> = (data) => {
-        if (!!pendingEmail) useVerify({ ...data, email:pendingEmail} , {
-            onSuccess(data) {
-                router.push('/forget-password/reset/')
-            },
-        })
-        if(!pendingEmail) router.push("/login/")
+        if (isGoogleMode) {
+            verifyGoogleOTP(data, {
+                onSuccess() {
+                    router.replace(onSuccessPath ?? '/google-set-password/reset/')
+                },
+            })
+            return
+        }
+
+        if (!!pendingEmail) {
+            verifyForgetOTP({ ...data, email: pendingEmail } , {
+                onSuccess() {
+                    router.replace(onSuccessPath ?? '/forget-password/reset/')
+                },
+            })
+            return
+        }
+
+        router.replace("/login/")
     }
     
     return (

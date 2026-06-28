@@ -30,7 +30,7 @@ export default async function RootLayout({
                 <QueryProvider>
                     {children}
                 </QueryProvider>
-                <Toaster position="top-right"/>
+                <Toaster position="top-right" theme="light"/>
             </body>
         </html>
     );

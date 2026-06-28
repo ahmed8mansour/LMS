@@ -7,7 +7,7 @@ import random
 import string
 import secrets
 
-
+from cloudinary.models import CloudinaryField
 # models.py
 
 
@@ -21,7 +21,7 @@ class PasswordResetToken(models.Model):
     token = models.CharField(
         max_length=64,
         unique=True,
-        db_index=True  # ✅ للبحث السريع
+        db_index=True  
     )
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField()
@@ -190,7 +190,7 @@ class CustomUserManager(BaseUserManager):
 class CustomUser(AbstractBaseUser, PermissionsMixin):
     # fields from the abstract baseuser : (last login , password)
     # fields from the PermissionsMixin : (groups , permissions)
-    profile_picture = models.ImageField(upload_to='LMS/PFP/')
+    profile_picture = models.URLField(max_length=500, null=True, blank=True)
     username = models.CharField(max_length=255, unique=True)
     first_name = models.CharField(max_length=255, blank=True)
     last_name = models.CharField(max_length=255, blank=True)

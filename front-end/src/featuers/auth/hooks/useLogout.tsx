@@ -8,7 +8,7 @@ export function useLogout() {
     return useMutation({
         mutationFn: authAPI.userLogout,
         onSuccess(data: any, variables, onMutateResult, context) {
-            queryClient.removeQueries({ queryKey: ['user', 'profile'] });
+            queryClient.clear();
             toastsuccess('Logged out successfully', data.message)
         },
         onError(error: any, variables, onMutateResult, context) {

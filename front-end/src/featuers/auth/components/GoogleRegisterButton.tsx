@@ -20,7 +20,7 @@ export function GoogleRegisterButton({ role = 'student' }: GoogleAuthButtonProps
                 code: codeResponse.code,
                 role: role,
             } , {onSuccess(data,) {
-                router.push("/dashboard")
+                router.replace("/dashboard")
             },}
         );
         },

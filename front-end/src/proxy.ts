@@ -13,36 +13,56 @@ export default function middleware(req: NextRequest) {
     const password_reset_token = req.cookies.get("password_reset_token")?.value;
 
     const { pathname } = req.nextUrl;
+    const normalizedPathname = pathname.endsWith("/") && pathname !== "/" ? pathname.slice(0, -1) : pathname;
 
     const isAuthenticated = !!accessToken || !!refreshToken;
 
-    const isPublicRoute = PUBLIC_ROUTES.includes(pathname);
+    const isPublicRoute = PUBLIC_ROUTES.includes(normalizedPathname);
 
     const isProtectedRoute = PROTECTED_ROUTES.some((route) =>
-        pathname.startsWith(route)
+        normalizedPathname.startsWith(route)
     );
 
     // ============================================
     // Forget Password Flow
     // ============================================
-    if (pathname === "/forget-password" && isAuthenticated) {
+    if (normalizedPathname === "/forget-password" && isAuthenticated) {
         return NextResponse.redirect(new URL("/dashboard", req.url));
     }
 
-    if (pathname === "/forget-password/verify" && !Fg_email && !password_reset_token) {
+    if (normalizedPathname === "/forget-password/verify" && !Fg_email && !password_reset_token) {
         return NextResponse.redirect(new URL("/forget-password", req.url));
     }
 
-    if (pathname === "/forget-password/verify" && password_reset_token) {
+    if (normalizedPathname === "/forget-password/verify" && password_reset_token) {
         return NextResponse.redirect(new URL("/forget-password/reset", req.url));
     }
 
-    if (pathname === "/forget-password/reset" && !password_reset_token && !Fg_email) {
+    if (normalizedPathname === "/forget-password/reset" && !password_reset_token && !Fg_email) {
         return NextResponse.redirect(new URL("/forget-password", req.url));
     }
 
-    if (pathname === "/forget-password/reset" && Fg_email) {
+    if (normalizedPathname === "/forget-password/reset" && Fg_email) {
         return NextResponse.redirect(new URL("/forget-password/verify", req.url));
+    }
+
+    // ============================================
+    // Google Set Password Flow
+    // ============================================
+    if (normalizedPathname.startsWith("/google-set-password") && !isAuthenticated) {
+        return NextResponse.redirect(new URL("/login", req.url));
+    }
+
+    if (normalizedPathname === "/google-set-password" && password_reset_token) {
+        return NextResponse.redirect(new URL("/google-set-password/reset", req.url));
+    }
+
+    if (normalizedPathname === "/google-set-password/verify" && password_reset_token) {
+        return NextResponse.redirect(new URL("/google-set-password/reset", req.url));
+    }
+
+    if (normalizedPathname === "/google-set-password/reset" && !password_reset_token) {
+        return NextResponse.redirect(new URL("/google-set-password", req.url));
     }
 
     // ============================================
@@ -57,11 +77,11 @@ export default function middleware(req: NextRequest) {
     // Verify OTP Flow
     // ============================================
 
-    if (pathname === "/verifyotp" && !pendingEmail && !isAuthenticated) {
+    if (normalizedPathname === "/verifyotp" && !pendingEmail && !isAuthenticated) {
         return NextResponse.redirect(new URL("/register", req.url));
     }
 
-    if (pathname === "/verifyotp" && !pendingEmail && isAuthenticated) {
+    if (normalizedPathname === "/verifyotp" && !pendingEmail && isAuthenticated) {
         return NextResponse.redirect(new URL("/dashboard", req.url));
     }
 

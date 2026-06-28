@@ -20,7 +20,7 @@ export default async function RootLayout({
         <main className={` font-manrope antialiased bg-lightbg flex  min-h-screen`} >
                 <Sidebar/>
                 <main
-                    className="min-h-screen flex-1 p-8  overflow-y-auto"
+                    className="min-h-screen flex-1 md:p-8 py-8 px-4 overflow-y-auto"
                 >
                     {children}
                 </main>

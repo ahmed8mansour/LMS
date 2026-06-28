@@ -15,6 +15,7 @@ export const toastsuccess = (head: string, body?: string) => {
     })
 }
 
+
 export const toasterror = (head: string, body: string) => {
     toast.error(head, {
         position: "top-right",
@@ -23,8 +24,19 @@ export const toasterror = (head: string, body: string) => {
     })
 }
 
+// create a toastinfo function as same as the functions above but with a blue info icon
+
+export const toastinfo = (head: string, body: string) => {
+    toast.info(head, {
+        position: "top-right",
+        description: body,
+        icon: <MdError className="h-5 w-5 text-blue-500" />
+    })
+}
+
 export function handleAuthError(error: any, fallbackHead: string = 'Authentication Failed') {
     // Handle network errors
+    console.log(error)
     if (!error.response) {
         toasterror('Network Error', "Can't connect to server")
         return
@@ -36,6 +48,5 @@ export function handleAuthError(error: any, fallbackHead: string = 'Authenticati
     // Extract error message from response
     const message = error.response.data?.error || error.response.data?.detail || 'Something went wrong'
     const displayMessage = typeof message === 'string' ? message : Array.isArray(message) ? message.join('\n') : 'Something went wrong'
-    
     toasterror(fallbackHead, displayMessage)
 }

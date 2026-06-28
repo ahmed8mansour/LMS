@@ -1,12 +1,12 @@
-import axios from '@/lib/axios';
+import axiosInstance from '@/lib/axios';
 import { Course , CourseFilterParams , PaginatedResponse } from '../types/course.types';
 async function getCourse(id:string) : Promise<Course>{
-    const {data} =  await axios.get(`courses/student/courses/${id}`) 
+    const {data} =  await axiosInstance.get(`courses/student/courses/${id}`) 
     return data;
 }
 
 async function getCourses(params1  : CourseFilterParams) : Promise<PaginatedResponse<Course>>{
-    const {data} =  await axios.get(`courses/student/courses/` ,
+    const {data} =  await axiosInstance.get(`courses/student/courses/` ,
         {
             params:params1,
             paramsSerializer : (params) => {

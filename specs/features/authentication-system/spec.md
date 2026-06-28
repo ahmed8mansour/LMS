@@ -2,19 +2,21 @@
 
 ## Overview
 
-The Authentication System provides secure user identity management with multiple authentication methods, supporting three user roles: **student**, **instructor**, and **admin**. The system prioritizes security by using JWT tokens stored in HttpOnly cookies (not localStorage), protecting against XSS attacks.
+The Authentication System provides secure user identity management with multiple authentication methods, supporting three user roles: **student**, **instructor**, and **admin**. The system uses JWT tokens stored in HttpOnly cookies to protect against XSS while still supporting secure refresh and logout.
 
 ---
 
 ## What This Feature Does
 
-1. **User Registration**: Email/password signup with email verification via 6-digit OTP
+1. **User Registration**: Email/password signup with OTP verification
 2. **User Login**: Authenticate with email/password credentials
 3. **Google OAuth**: Login and registration via Google accounts
-4. **Password Recovery**: Forget password via email OTP flow
-5. **Password Management**: Change password, set initial password for OAuth users
-6. **Session Management**: JWT tokens with automatic refresh, secure logout with token blacklisting
-7. **Role-Based Access Control**: Three distinct user types with different permissions
+4. **Google Password Setup**: OTP-based password setup for Google users
+5. **Password Recovery**: Forget password via OTP and reset-token cookie
+6. **Password Management**: Change password and set password for OAuth users
+7. **Session Management**: JWT access/refresh cookies, refresh endpoint, logout blacklist
+8. **User Profile**: Fetch/update profile and get Cloudinary upload signature
+9. **Role-Based Access Control**: Student, instructor, and admin roles
 
 ---
 
@@ -22,11 +24,11 @@ The Authentication System provides secure user identity management with multiple
 
 ### Registration Endpoints
 
-| Endpoint | Method | Auth Required | Description |
-|----------|--------|---------------|-------------|
-| `/auth/user/register/sendOTP/` | POST | No | Initiate registration, send OTP to email |
-| `/auth/user/register/verifyOTP/` | POST | No | Verify OTP, create account, set JWT cookies |
-| `/auth/user/resendOTP/` | POST | No | Resend OTP for pending registration |
+| Endpoint                         | Method | Auth Required | Description                                |
+| -------------------------------- | ------ | ------------- | ------------------------------------------ |
+| `/auth/user/register/sendOTP/`   | POST   | No            | Start registration and send OTP to email   |
+| `/auth/user/register/verifyOTP/` | POST   | No            | Verify OTP, activate user, set JWT cookies |
+| `/auth/user/resendOTP/`          | POST   | No            | Resend registration OTP                    |
 
 **Request/Response Examples:**
 
@@ -37,7 +39,7 @@ POST /auth/user/register/sendOTP/
   "username": "johndoe",
   "email": "john@example.com",
   "password": "securepass123",
-  "role": "student"  # or "instructor"
+  "role": "student"
 }
 
 Response (201):
@@ -57,18 +59,17 @@ POST /auth/user/register/verifyOTP/
 
 Response (201):
 {
-  "message": "Account verified successfully",
-  "user_data": { ... },
-  "tokens": { "access": "...", "refresh": "..." }  # Also set as cookies
+  "message": "Email verified successfully! You can now login",
+  "user_data": { ... }
 }
 ```
 
 ### Login Endpoints
 
-| Endpoint | Method | Auth Required | Description |
-|----------|--------|---------------|-------------|
-| `/auth/user/login/` | POST | No | Authenticate with credentials |
-| `/auth/token/refresh/` | POST | No | Refresh access token (from cookie) |
+| Endpoint               | Method | Auth Required | Description                      |
+| ---------------------- | ------ | ------------- | -------------------------------- |
+| `/auth/user/login/`    | POST   | No            | Authenticate with credentials    |
+| `/auth/token/refresh/` | POST   | No            | Refresh access token from cookie |
 
 **Request/Response Examples:**
 
@@ -89,53 +90,58 @@ Response (200):
 
 ### Google OAuth Endpoints
 
-| Endpoint | Method | Auth Required | Description |
-|----------|--------|---------------|-------------|
-| `/auth/google/user/register/` | POST | No | Register via Google OAuth |
-| `/auth/google/user/login/` | POST | No | Login via Google OAuth |
-| `/auth/google/user/setpassword/sendOTP/` | POST | Yes | Send OTP for password setup |
-| `/auth/google/user/setpassword/verifyOTP/` | POST | Yes | Verify OTP for password setup |
-| `/auth/google/user/setpassword/SetPassword/` | POST | Yes | Set password for OAuth user |
+| Endpoint                                     | Method | Auth Required | Description                          |
+| -------------------------------------------- | ------ | ------------- | ------------------------------------ |
+| `/auth/google/user/register/`                | POST   | No            | Register via Google OAuth            |
+| `/auth/google/user/login/`                   | POST   | No            | Login via Google OAuth               |
+| `/auth/google/user/setpassword/sendOTP/`     | POST   | Yes           | Send OTP for Google password setup   |
+| `/auth/google/user/setpassword/verifyOTP/`   | POST   | Yes           | Verify OTP for Google password setup |
+| `/auth/google/user/setpassword/SetPassword/` | POST   | Yes           | Set password for OAuth user          |
 
 **Flow:**
-1. Frontend exchanges Google auth code for tokens
-2. If new user: register endpoint creates account
-3. Google users have no password initially
-4. Can set password later via OTP flow (enables email/password login)
+
+1. Frontend sends Google auth code to backend
+2. Backend exchanges code for Google user info
+3. Existing users can login; new users can register
+4. Google accounts start without a usable password
+5. Users can later set a password through OTP verification
 
 ### Password Recovery Endpoints
 
-| Endpoint | Method | Auth Required | Description |
-|----------|--------|---------------|-------------|
-| `/auth/user/forgetpassword/sendOTP/` | POST | No | Send reset OTP |
-| `/auth/user/forgetpassword/verifyOTP/` | POST | No | Verify reset OTP |
-| `/auth/user/forgetpassword/SetNewPassword/` | POST | No | Set new password (requires reset token cookie) |
+| Endpoint                                    | Method | Auth Required | Description                                   |
+| ------------------------------------------- | ------ | ------------- | --------------------------------------------- |
+| `/auth/user/forgetpassword/sendOTP/`        | POST   | No            | Send password reset OTP                       |
+| `/auth/user/forgetpassword/verifyOTP/`      | POST   | No            | Verify reset OTP and issue reset-token cookie |
+| `/auth/user/forgetpassword/SetNewPassword/` | POST   | No            | Set new password using reset-token cookie     |
+| `/auth/user/forgetpassword/resendOTP/`      | POST   | No            | Resend forget-password OTP                    |
 
 **Flow:**
+
 1. Send OTP to registered email
-2. Verify OTP (sets reset_token cookie)
-3. Submit new password (requires reset_token)
-4. Auto-login with new credentials
+2. Verify OTP and receive `password_reset_token` cookie
+3. Submit new password using the cookie
+4. Backend clears reset cookie and sets auth cookies
 
 ### Password Management Endpoints
 
-| Endpoint | Method | Auth Required | Description |
-|----------|--------|---------------|-------------|
-| `/auth/user/changepassword/` | POST | Yes (JWT) | Change password (requires old password) |
-| `/auth/user/setpassword/` | POST | Yes (JWT) | Set password for users without one |
+| Endpoint                     | Method | Auth Required | Description                           |
+| ---------------------------- | ------ | ------------- | ------------------------------------- |
+| `/auth/user/changepassword/` | POST   | Yes (JWT)     | Change password with current password |
+| `/auth/user/setpassword/`    | POST   | Yes (JWT)     | Set password for social login users   |
 
 ### User Profile Endpoints
 
-| Endpoint | Method | Auth Required | Description |
-|----------|--------|---------------|-------------|
-| `/auth/user/profile/` | GET | Yes (JWT) | Get current user data |
-| `/auth/user/update/` | PUT | Yes (JWT) | Update profile (partial allowed) |
+| Endpoint                             | Method | Auth Required | Description                     |
+| ------------------------------------ | ------ | ------------- | ------------------------------- |
+| `/auth/user/profile/`                | GET    | Yes (JWT)     | Fetch current user profile      |
+| `/auth/user/update/`                 | PUT    | Yes (JWT)     | Update user profile             |
+| `/auth/user/getCloudinarySignature/` | GET    | Yes (JWT)     | Get Cloudinary upload signature |
 
 ### Logout Endpoint
 
-| Endpoint | Method | Auth Required | Description |
-|----------|--------|---------------|-------------|
-| `/auth/user/logout/` | POST | Yes (JWT) | Blacklist token, clear cookies |
+| Endpoint             | Method | Auth Required | Description                               |
+| -------------------- | ------ | ------------- | ----------------------------------------- |
+| `/auth/user/logout/` | POST   | Yes (JWT)     | Blacklist refresh token and clear cookies |
 
 ---
 
@@ -143,44 +149,50 @@ Response (200):
 
 ### Pages
 
-| Page | Route | Purpose |
-|------|-------|---------|
-| Login | `/login` | Email/password login form |
-| Register | `/register` | Registration form with role selection |
-| Verify OTP | `/verifyotp` | OTP verification for registration |
-| Forget Password | `/forget-password` | Initiate password reset |
-| Verify Reset OTP | `/forget-password/verify` | Verify reset OTP |
-| Reset Password | `/forget-password/reset` | Set new password |
+| Page                       | Route                         | Purpose                                 |
+| -------------------------- | ----------------------------- | --------------------------------------- |
+| Login                      | `/login`                      | Email/password login                    |
+| Register                   | `/register`                   | Registration with role selection        |
+| Verify OTP                 | `/verifyotp`                  | Registration OTP verification           |
+| Forget Password            | `/forget-password`            | Request password reset OTP              |
+| Verify Reset OTP           | `/forget-password/verify`     | Verify password reset OTP               |
+| Reset Password             | `/forget-password/reset`      | Submit a new password                   |
+| Google Set Password        | `/google-set-password`        | Send OTP for Google password setup      |
+| Google Set Password Verify | `/google-set-password/verify` | Verify OTP for Google set-password flow |
+| Google Set Password Reset  | `/google-set-password/reset`  | Set new password for Google users       |
 
 ### Components
 
-| Component | Location | Purpose |
-|-----------|----------|---------|
-| `LoginForm` | `features/auth/components/LoginForm.tsx` | Login form with validation |
-| `RegisterForm` | `features/auth/components/RegisterForm.tsx` | Registration form |
-| `RegisterOTPComponent` | `features/auth/components/RegisterOTPComponent.tsx` | OTP input for registration |
-| `GoogleLoginButton` | `features/auth/components/GoogleLoginButton.tsx` | Google OAuth login |
-| `GoogleRegisterButton` | `features/auth/components/GoogleRegisterButton.tsx` | Google OAuth registration |
-| `UserAvatar` | `features/auth/components/UserAvatar.tsx` | User menu with logout |
-| `SendOTPForm` | `features/auth/components/forget-password/SendOTPForm.tsx` | Forget password email form |
-| `VerifyOTPForm` | `features/auth/components/forget-password/verifyOTPForm.tsx` | Reset OTP verification |
-| `ResetPasswordForm` | `features/auth/components/forget-password/ResetPasswordForm.tsx` | New password form |
+| Component              | Location                                                              | Purpose                            |
+| ---------------------- | --------------------------------------------------------------------- | ---------------------------------- |
+| `LoginForm`            | `featuers/auth/components/LoginForm.tsx`                              | Login form                         |
+| `RegisterForm`         | `featuers/auth/components/RegisterForm.tsx`                           | Registration form                  |
+| `RegisterOTPComponent` | `featuers/auth/components/RegisterOTPComponent.tsx`                   | Registration OTP entry             |
+| `GoogleLoginButton`    | `featuers/auth/components/GoogleLoginButton.tsx`                      | Google login button                |
+| `GoogleRegisterButton` | `featuers/auth/components/GoogleRegisterButton.tsx`                   | Google register button             |
+| `UserAvater`           | `featuers/auth/components/UserAvater.tsx`                             | User avatar menu and logout        |
+| `FPsendOTPForm`        | `featuers/auth/components/froget-password/SendOTPForm.tsx`            | Send OTP for reset or Google setup |
+| `FPverifyOTPForm`      | `featuers/auth/components/froget-password/verifyOTPForm.tsx`          | OTP verification form              |
+| `ResetPasswordForm`    | `featuers/auth/components/froget-password/ResetPasswordForm.tsx`      | Set new password                   |
+| `UserChangePassword`   | `featuers/auth/components/dashboard/settings/UserChangePassword.tsx`  | Change password form               |
+| `PasswordManager`      | `featuers/auth/components/dashboard/settings/UserPasswordManager.tsx` | Password management UI             |
 
 ### Hooks
 
-| Hook | Purpose |
-|------|---------|
-| `useLogin` | Login mutation with toast handling |
-| `useRegister` | Registration with pending email state |
-| `useRegisterVerifyOTP` | OTP verification with redirect |
-| `useRegisterResendOTP` | Resend OTP functionality |
-| `useLogout` | Logout with token blacklisting |
-| `useProfile` | Fetch current user profile |
-| `useGoogleLogin` | Google OAuth login |
-| `useGoogleRegister` | Google OAuth registration |
-| `useSendOTP` (forget-password) | Initiate password reset |
-| `useVerifyOTP` (forget-password) | Verify reset OTP |
-| `useResetPassword` | Complete password reset |
+| Hook                            | Purpose                              |
+| ------------------------------- | ------------------------------------ |
+| `useLogin`                      | Login mutation                       |
+| `useRegister`                   | Register mutation                    |
+| `useRegisterVerifyOTP`          | Registration OTP verification        |
+| `useRegisterResendOTP`          | Resend registration OTP              |
+| `useLogout`                     | Logout mutation                      |
+| `useProfile`                    | Fetch authenticated user profile     |
+| `useGoogleLogin2`               | Google OAuth login                   |
+| `useGoogleRegister`             | Google OAuth registration            |
+| `useResetPassword`              | Password reset mutation              |
+| `useGoogleSetPasswordSendOTP`   | Send OTP for Google password setup   |
+| `useGoogleSetPasswordVerifyOTP` | Verify OTP for Google password setup |
+| `useGoogleSetPasswordReset`     | Set new password for Google users    |
 
 ---
 
@@ -192,17 +204,18 @@ Response (200):
 User                          Frontend                        Backend
   |                              |                               |
   |-- Fill form (email/pass) --->|                               |
-  |                              |-- POST /register/sendOTP ---->|
+  |                              |-- POST /auth/user/register/sendOTP/ --->|
+  |                              |                               |-- Create inactive user
   |                              |                               |-- Generate OTP
   |                              |                               |-- Send email
-  |                              |<-- Return: pending status -----|
+  |                              |<-- Return pending registration ---|
   |<-- Show OTP screen ----------|                               |
   |-- Enter OTP ---------------->|                               |
-  |                              |-- POST /register/verifyOTP --->|
+  |                              |-- POST /auth/user/register/verifyOTP/ ->|
   |                              |                               |-- Validate OTP
-  |                              |                               |-- Create user
+  |                              |                               |-- Activate user
   |                              |                               |-- Set JWT cookies
-  |                              |<-- Return: user data ----------|
+  |                              |<-- Return user data --------------|
   |<-- Redirect to dashboard -----|                               |
 ```
 
@@ -212,10 +225,10 @@ User                          Frontend                        Backend
 User                          Frontend                        Backend
   |                              |                               |
   |-- Enter credentials -------->|                               |
-  |                              |-- POST /login ---------------->|
-  |                              |                               |-- Validate credentials
-  |                              |                               |-- Set JWT cookies (HttpOnly)
-  |                              |<-- Return: user data ----------|
+  |                              |-- POST /auth/user/login/ ---------->|
+  |                              |                               |-- Authenticate user
+  |                              |                               |-- Set JWT cookies
+  |                              |<-- Return user data --------------|
   |<-- Redirect to dashboard ---|                               |
 ```
 
@@ -225,12 +238,13 @@ User                          Frontend                        Backend
 Frontend                      Backend
   |                              |
   |-- Request with expired JWT ->|
-  |                              |-- Return 401
+  |                              |-- Returns 401
   |<-- 401 ----------------------|
   |                              |
-  |-- POST /token/refresh ------>|  (uses refresh_token cookie)
-  |                              |-- Generate new access_token
-  |<-- Set new cookie -----------|
+  |-- POST /auth/token/refresh/ ->|
+  |                              |-- Read refresh_token cookie
+  |                              |-- Set new access_token cookie
+  |<-- Return success message ---|
   |                              |
   |-- Retry original request --->|
 ```
@@ -243,11 +257,11 @@ User                          Google                          Frontend          
   |-- Click Google Sign In ----->|                               |                               |
   |                              |<-- OAuth consent --------------|                               |
   |                              |-- Return auth code ---------->|                               |
-  |                              |                               |-- POST /google/login -------->|
+  |                              |                               |-- POST /auth/google/user/login/ -->|
   |                              |                               |                               |-- Exchange code for user info
-  |                              |                               |                               |-- Find/create user
+  |                              |                               |                               |-- Find or create user
   |                              |                               |                               |-- Set JWT cookies
-  |                              |                               |<-- Return user data -----------|
+  |                              |                               |<-- Return user data ------------|
   |                              |                               |<-- Redirect to dashboard ------|
 ```
 
@@ -301,32 +315,32 @@ User                          Google                          Frontend          
 
 4. **Email Verification**: Only required at registration, not re-verification on email change
 
-5. **Password Strength**: Only minimum length enforced, no complexity requirements
+5. **Two-Factor Auth**: No 2FA/MFA support implemented
 
-6. **Two-Factor Auth**: No 2FA/MFA support implemented
-
-7. **Session Management**: No way to view/revoke active sessions from user side
+6. **Session Management**: No way to view/revoke active sessions from user side
 
 ---
 
 ## Permissions by Role
 
-| Role | is_staff | is_superuser | Permissions |
-|------|----------|--------------|-------------|
-| Student | False | False | Browse courses, enroll, track progress |
-| Instructor | True | False | CRUD own courses, sections, lectures, quizzes |
-| Admin | True | True | Full CRUD on all resources |
+| Role       | is_staff | is_superuser | Permissions                                   |
+| ---------- | -------- | ------------ | --------------------------------------------- |
+| Student    | False    | False        | Browse courses, enroll, track progress        |
+| Instructor | True     | False        | CRUD own courses, sections, lectures, quizzes |
+| Admin      | True     | True         | Full CRUD on all resources                    |
 
 ---
 
 ## Dependencies
 
 ### Backend
+
 - `djangorestframework-simplejwt` - JWT implementation
 - `django-allauth` - Google OAuth integration
 - `django-cors-headers` - CORS for cookie-based auth
 
 ### Frontend
+
 - `@react-oauth/google` - Google OAuth client
 - `react-hook-form` - Form management
 - `zod` - Schema validation

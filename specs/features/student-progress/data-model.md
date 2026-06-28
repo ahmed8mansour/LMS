@@ -179,24 +179,48 @@ Records each individual answer within a quiz attempt.
 ### Lecture Completion Flow
 
 ```
-1. Student views lecture
-2. Student clicks "Mark Complete"
-3. Backend creates LectureProgress:
+1. Student opens /dashboard/learn/{course_id}/lecture/{lecture_id}
+2. Frontend calls GET /progress/student/learn/lecture/{lecture_id}/
+3. Backend verifies enrollment and lecture unlock state
+4. Backend returns lecture id, title, duration, order, video_url, is_completed, and is_unlocked
+5. Frontend renders the native HTML video player
+6. Student clicks "Mark Complete"
+7. Frontend calls POST /progress/student/learn/lecture/markcomplete/ with:
+   {
+       lecture_id: 123
+   }
+8. Backend creates or updates LectureProgress:
    {
        user: student_profile,
        lecture: lecture_123,
        is_completed: True,
        completed_at: "2025-04-06T14:30:00Z"
    }
-4. Next lecture becomes unlocked
+9. Frontend invalidates dashboard/course progress queries
+10. Next lecture or quiz becomes unlocked according to backend locking rules
+```
+
+### Implemented Frontend Learning Flow
+
+```
+1. Student opens /dashboard
+2. Frontend calls GET /progress/student/overview/
+3. Student opens /dashboard/my-courses
+4. Frontend calls GET /progress/student/courses/
+5. Student opens /dashboard/learn/{course_id}
+6. Frontend calls GET /progress/student/learn/course/{course_id}/
+7. Learning sidebar uses returned sections, lectures, quiz status, and unlock flags
+8. Student opens an unlocked lecture and marks it complete
+9. LectureProgress persists the completion and frontend refreshes progress-related queries
 ```
 
 ### Quiz Attempt Flow
 
 ```
+Backend implementation:
 1. Student completes all lectures in section
 2. Quiz becomes unlocked
-3. Student submits quiz with answers:
+3. Client submits quiz with answers:
    [
        {question: 1, choice: 3},
        {question: 2, choice: 1},
@@ -223,6 +247,10 @@ Records each individual answer within a quiz attempt.
        {attempt: attempt_id, question: 3, selected_choice: 2, is_correct: False}
    ]
 6. Next section becomes unlocked
+
+Frontend status:
+- Quiz page and quiz result page currently use mock data.
+- Frontend does not yet call GET /progress/student/learn/quiz/{quiz_id}/ or POST /progress/student/learn/quiz/makeattempt/.
 ```
 
 ---
@@ -334,33 +362,49 @@ interface DashboardStats {
 }
 
 interface DashboardCourse {
-    course_id: number;
+    id: string;
     title: string;
     thumbnail: string;
+    category: string;
     progress: number;          // 0-100 percentage
-    last_accessed: string | null;
-    completed_at: string | null;
+    instructor_firstname: string;
+    instructor_lastname: string;
+    instructor_avatar: string;
+    total_lectures: number;
+    lectures_completed: number;
 }
 
 // Course Progress Detail
 interface CourseProgress {
-    course: {
-        id: number;
-        title: string;
-        thumbnail: string;
-    };
-    progress: number;
+    course: EnrolledCourse;
+    progress: number | string;
     sections: SectionProgress[];
+}
+
+interface EnrolledCourse {
+    id: number;
+    title: string;
+    description: string;
+    thumbnail: string;
+    category: string;
+    level: string;
+    price: string;
+    rating: string;
+    subscribers_count: number;
+    reviews_count: number;
+    is_published: boolean;
+    language: string;
+    last_updated: string;
+    goals_list: string[];
+    instructor_profile: unknown;
 }
 
 interface SectionProgress {
     id: number;
     title: string;
     order: number;
-    is_locked: boolean;
     is_completed: boolean;
-    completed_lectures: number;
-    total_lectures: number;
+    is_unlocked: boolean;
     lectures: LectureStatus[];
     quiz: QuizStatus | null;
 }
@@ -369,20 +413,27 @@ interface LectureStatus {
     id: number;
     title: string;
     duration: string;
+    order: number;
+    video_url?: string;         // omitted when lecture is locked in course overview
     is_completed: boolean;
-    can_complete: boolean;
+    is_unlocked: boolean;
 }
 
 interface QuizStatus {
     id: number;
     title: string;
-    is_locked: boolean;
-    is_completed: boolean;
-    passed: boolean;
-    score: number;
+    is_passed: boolean;
+    is_unlocked: boolean;
 }
 
-// Quiz Submission
+interface LectureCompletionResponse {
+    lecture_id: number;
+    is_completed: boolean;
+    completed_at: string;
+    already_completed: boolean;
+}
+
+// Quiz Submission (backend implemented, frontend not integrated yet)
 interface QuizSubmission {
     quiz_id: number;
     answers: {

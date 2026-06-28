@@ -18,7 +18,7 @@ from .serializers import (
     StudentDashboardOverviewSerializer , SectionProgressSerializer ,
     CourseOverviewSerializer , EnrolledCourseSerializer ,
     LectureCompleteResponseSerializer , QuizSubmitSerializer , QuizSubmitResponseSerializer,
-    QuizDataSerializer 
+    QuizDataSerializer , LectureProgressSerializer
 )
 from .models import LectureProgress , QuizAttempt , QuizAttemptAnswer
 from .utils import get_student_sorted_courses , is_section_unlocked , is_lecture_unlocked , is_quiz_unlocked , get_section_progress
@@ -30,13 +30,17 @@ class StudentDashboardOverviewView(APIView):
 
     def get(self , request):
         user = request.user
-        user_profile = StudentProfile.objects.get(user=user)
+        try:
+            user_profile = StudentProfile.objects.get(user=user)
+        except StudentProfile.DoesNotExist:
+            return Response({"error":"Student profile not found"},status=status.HTTP_404_NOT_FOUND)
+            
         user_enrollments = Enrollment.objects.filter(user=user , is_active=True).select_related('course')
 
         if not user_enrollments.exists():
-            return Response({"error":"You didn't joined any courses yet"},status=status.HTTP_204_NO_CONTENT)
+            return Response({"error":"You didn't joined any courses yet"},status=status.HTTP_200_OK)
 
-
+        print(user_enrollments)
         # _____stats_____________________
 
         # getting : total mins_spent
@@ -76,11 +80,14 @@ class StudentDashboardCourses(APIView):
 
     def get(self , request):
         user = request.user
-        user_profile = StudentProfile.objects.get(user=user)
+        try:
+            user_profile = StudentProfile.objects.get(user=user)
+        except StudentProfile.DoesNotExist:
+            return Response({"error":"Student profile not found"},status=status.HTTP_404_NOT_FOUND)
         user_enrollments = Enrollment.objects.filter(user=user , is_active=True).select_related('course')
 
         if not user_enrollments.exists():
-            return Response({"error":"You didn't joined any courses yet"},status=status.HTTP_204_NO_CONTENT)
+            return Response({"error":"You didn't joined any courses yet"},status=status.HTTP_200_OK)
 
 
 
@@ -93,7 +100,7 @@ class StudentDashboardCourses(APIView):
 
 
         sorted_courses = get_student_sorted_courses(user, user_enrollments, completed_lectures)
-
+        print(sorted_courses)
 
         serializer = CourseOverviewSerializer(sorted_courses , many=True)
 
@@ -113,7 +120,10 @@ class EnrolledCourseDetailView(APIView):
 
     def get(self , request , course_id):
         user = request.user
-        user_profile = StudentProfile.objects.get(user=user)
+        try:
+            user_profile = StudentProfile.objects.get(user=user)
+        except StudentProfile.DoesNotExist:
+            return Response({"error":"Student profile not found"},status=status.HTTP_404_NOT_FOUND)
         enrollment = Enrollment.objects.filter(user=user , is_active=True , course = course_id).select_related('course').first()
 
         if not enrollment:
@@ -139,18 +149,21 @@ class EnrolledCourseDetailView(APIView):
             'progress': round(completed_count / total_lectures * 100, 1) if total_lectures > 0 else 0,
             'sections': sections_serializer.data,
         }
-
-        serializer = EnrolledCourseSerializer(data)
+        
+        serializer = EnrolledCourseSerializer(data )
         return Response(serializer.data , status=status.HTTP_200_OK)
     
 
-class EnrolledSectionDetialView(APIView):
+class  EnrolledSectionDetialView(APIView):
     authentication_classes =[CookieJWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self , request , section_id):
         user = request.user
-        user_profile = StudentProfile.objects.get(user=user)
+        try:
+            user_profile = StudentProfile.objects.get(user=user)
+        except StudentProfile.DoesNotExist:
+            return Response({"error":"Student profile not found"},status=status.HTTP_404_NOT_FOUND)
 
         section = Section.objects.filter(id=section_id).first()
         if not section:
@@ -173,6 +186,49 @@ class EnrolledSectionDetialView(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
+class EnrolledLectureDetailView(APIView):
+    authentication_classes =[CookieJWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, lecture_id):
+        user = request.user
+        try:
+            user_profile = StudentProfile.objects.get(user=user)
+        except StudentProfile.DoesNotExist:
+            return Response({"error":"Student profile not found"},status=status.HTTP_404_NOT_FOUND)
+
+        lecture = Lecture.objects.select_related('section__course').filter(id=lecture_id).first()
+        if not lecture:
+            return Response({"error": "Lecture not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        enrollment = Enrollment.objects.filter(user=user, course=lecture.section.course, is_active=True).first()
+        if not enrollment:
+            return Response({"error": "You don't have access to this course"}, status=status.HTTP_403_FORBIDDEN)
+
+        if not is_lecture_unlocked(user_profile, lecture):
+            return Response({"error": "This lecture is locked"}, status=status.HTTP_403_FORBIDDEN)
+
+        completed_lecture_ids = set(
+            LectureProgress.objects.filter(
+                user=user_profile,
+                lecture=lecture,
+                is_completed=True
+            ).values_list('lecture_id', flat=True)
+        )
+
+        serializer = LectureProgressSerializer(
+            lecture,
+            context={
+                'completed_lecture_ids': completed_lecture_ids,
+                'unlocked_lecture_ids': {lecture.id},
+            }
+        )
+
+        return Response(
+            serializer.data
+        , status=status.HTTP_200_OK)
+
+
 
 class MarkLectureCompleteView(APIView):
     authentication_classes = [CookieJWTAuthentication]
@@ -181,14 +237,17 @@ class MarkLectureCompleteView(APIView):
     def post(self, request):
         """
         authenticated
-        post : 
+        post :
         body : {
         lecture : id,
         }
         """
-        user_profile = StudentProfile.objects.get(user=request.user)
+        try:
+            user_profile = StudentProfile.objects.get(user=request.user)
+        except StudentProfile.DoesNotExist:
+            return Response({"error":"Student profile not found"},status=status.HTTP_404_NOT_FOUND)
         data = request.data
-        lecture_id = data['lecture']
+        lecture_id = data['lecture_id']
         if not lecture_id :
             return Response({"error": "please provide the id of the lecture "}, status=status.HTTP_404_NOT_FOUND)
             
@@ -242,7 +301,10 @@ class SubmitQuizView(APIView):
     """
 
     def post(self, request):
-        user_profile = StudentProfile.objects.get(user=request.user)
+        try:
+            user_profile = StudentProfile.objects.get(user=request.user)
+        except StudentProfile.DoesNotExist:
+            return Response({"error":"Student profile not found"},status=status.HTTP_404_NOT_FOUND)
         quiz_id = request.data['quiz_id']
         if not quiz_id:
             return Response({"error": "please provide the id of the quiz"}, status=status.HTTP_404_NOT_FOUND)
@@ -349,7 +411,10 @@ class QuizEnrolledStudentView(APIView):
 
 
     def get(self , request , quiz_id):
-        user_profile = StudentProfile.objects.get(user=request.user)
+        try:
+            user_profile = StudentProfile.objects.get(user=request.user)
+        except StudentProfile.DoesNotExist:
+            return Response({"error":"Student profile not found"},status=status.HTTP_404_NOT_FOUND)
         quiz = Quiz.objects.select_related('section__course').prefetch_related(
             'question__choice'
         ).filter(id=quiz_id).first()

@@ -16,7 +16,7 @@ export function RegisterForm() {
     const {mutate:userRegister , isPending } = useRegister()
     const onSubmit: SubmitHandler<RegisterFormData> = (data) => {
         userRegister(data , {onSuccess(data, variables, onMutateResult, context) {
-            router.push("/verifyotp/")
+            router.replace("/verifyotp/")
         },})
         
     }

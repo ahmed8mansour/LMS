@@ -6,9 +6,17 @@ The Student Progress Tracking system monitors student learning activities, inclu
 
 ---
 
-## Status: BACKEND COMPLETE / FRONTEND MISSING
+## Status
 
-This feature has fully functional backend APIs but no frontend dashboard implementation. The backend provides all necessary endpoints for tracking student progress.
+| Component | Status |
+|-----------|--------|
+| Backend APIs | IMPLEMENTED (contract differs from examples below where noted) |
+| Frontend - Student Dashboard Overview | IMPLEMENTED |
+| Frontend - My Courses Page | IMPLEMENTED |
+| Frontend - Course Progress & Lecture Learning Flow | PARTIALLY IMPLEMENTED |
+| Frontend - Quiz Flow | MISSING / MOCK UI ONLY |
+
+The backend provides the progress endpoints, and the frontend now implements the dashboard overview, enrolled course list, enrolled course curriculum, lecture playback, sidebar navigation, and lecture completion flow. Quiz pages still use mock data and are not connected to the backend quiz APIs.
 
 ---
 
@@ -38,6 +46,7 @@ This feature has fully functional backend APIs but no frontend dashboard impleme
 |----------|--------|------|-------------|
 | `/progress/student/learn/course/{id}/` | GET | Yes | Course detail with section progress |
 | `/progress/student/learn/section/{id}/` | GET | Yes | Section with lecture/quiz status |
+| `/progress/student/learn/lecture/{id}/` | GET | Yes | Get one unlocked lecture, including `video_url` |
 | `/progress/student/learn/lecture/markcomplete/` | POST | Yes | Mark lecture complete |
 | `/progress/student/learn/quiz/makeattempt/` | POST | Yes | Submit quiz answers |
 | `/progress/student/learn/quiz/{id}/` | GET | Yes | Get quiz questions |
@@ -58,12 +67,16 @@ This feature has fully functional backend APIs but no frontend dashboard impleme
   },
   "courses": [
     {
-      "course_id": 1,
+      "id": "1",
       "title": "Python Bootcamp",
       "thumbnail": "https://...",
+      "category": "Development",
       "progress": 75.5,
-      "last_accessed": "2025-04-05T10:30:00Z",
-      "completed_at": null
+      "instructor_firstname": "John",
+      "instructor_lastname": "Doe",
+      "instructor_avatar": "https://...",
+      "total_lectures": 20,
+      "lectures_completed": 15
     }
   ]
 }
@@ -73,6 +86,14 @@ This feature has fully functional backend APIs but no frontend dashboard impleme
 - `completed_courses`: Count of courses with 100% progress
 - `inprogress_courses`: Count of courses with <100% progress
 - `total_mins_spent`: Sum of duration from completed lectures
+- `total_lectures`: Total lectures in the course
+- `lectures_completed`: Number of lectures marked as complete by student
+
+**Frontend Implementation:**
+- Path: `featuers/progress/components/student/dashboardoverview.tsx`
+- Components: `DashboardPage`, `StatCard`, `DashboardCourseCard`
+- Hook: `useStudentDashboardOverview` (React Query, 5min stale time)
+- Features: Stats cards, overall progress indicator, continue learning banner, learning activity section, course grid
 
 ### StudentDashboardCourses
 
@@ -80,14 +101,25 @@ This feature has fully functional backend APIs but no frontend dashboard impleme
 ```json
 [
   {
-    "course_id": 1,
+    "id": "1",
     "title": "Python Bootcamp",
     "thumbnail": "https://...",
+    "category": "development",
     "progress": 75.5,
-    "last_accessed": "2025-04-05T10:30:00Z"
+    "instructor_firstname": "John",
+    "instructor_lastname": "Doe",
+    "instructor_avatar": "https://...",
+    "total_lectures": 20,
+    "lectures_completed": 15
   }
 ]
 ```
+
+**Frontend Implementation:**
+- Path: `app/dashboard/(main)/my-courses/page.tsx`
+- Component: `featuers/progress/components/student/DashboardCourses.tsx`
+- Hook: `useStudentDashboardCourses`
+- Features: all/in-progress/completed tabs, enrolled course cards, progress bars, loading/error/empty states
 
 ---
 
@@ -111,26 +143,24 @@ This feature has fully functional backend APIs but no frontend dashboard impleme
       "id": 1,
       "title": "Introduction",
       "order": 1,
-      "is_locked": false,
+      "is_unlocked": true,
       "is_completed": true,
-      "completed_lectures": 3,
-      "total_lectures": 3,
       "lectures": [
         {
           "id": 1,
           "title": "Welcome",
           "duration": "10.50",
+          "order": 1,
+          "video_url": "https://...",
           "is_completed": true,
-          "can_complete": true
+          "is_unlocked": true
         }
       ],
       "quiz": {
         "id": 1,
         "title": "Introduction Quiz",
-        "is_locked": false,
-        "is_completed": true,
-        "passed": true,
-        "score": 85.0
+        "is_passed": true,
+        "is_unlocked": true
       }
     }
   ]
@@ -141,6 +171,12 @@ This feature has fully functional backend APIs but no frontend dashboard impleme
 - Section 1: Always unlocked
 - Section N: Unlocked when section N-1 quiz passed
 
+**Frontend Implementation:**
+- Path: `app/dashboard/learn/[id]/page.tsx`
+- Component: `featuers/progress/components/student/CourseContent.tsx`
+- Hook: `useEnrolledStudentCourseOverview`
+- Features: enrolled-course access handling, course progress bar, section count, first playable lecture selection, start/review CTA
+
 ### Mark Lecture Complete
 
 **Endpoint:** `POST /progress/student/learn/lecture/markcomplete/`
@@ -148,7 +184,7 @@ This feature has fully functional backend APIs but no frontend dashboard impleme
 **Request:**
 ```json
 {
-  "lecture": 123
+  "lecture_id": 123
 }
 ```
 
@@ -167,6 +203,12 @@ This feature has fully functional backend APIs but no frontend dashboard impleme
 - Lecture must be unlocked (sequential)
 - Idempotent (safe to call multiple times)
 
+**Frontend Implementation:**
+- Path: `app/dashboard/learn/[id]/lecture/[lectureId]/page.tsx`
+- Components: `LectureContent`, `MarkLectureComplete`
+- Hooks/API: `useEnrolledLectureDetail`, `useMakeLectureCompleted`, `progressAPI.getEnrolledLectureDetail`, `progressAPI.makeLectureCompleted`
+- Features: native HTML video playback from `video_url`, manual mark-complete button, next/previous lecture navigation, retry/error handling
+
 ### Get Quiz
 
 **Endpoint:** `GET /progress/student/learn/quiz/{quiz_id}/`
@@ -174,51 +216,44 @@ This feature has fully functional backend APIs but no frontend dashboard impleme
 **Response (200) - First Attempt:**
 ```json
 {
-  "id": 1,
   "title": "Introduction Quiz",
   "questions_count": 5,
+  "passed": false,
   "questions": [
     {
-      "id": 1,
       "text": "What is Python?",
       "order": 1,
       "choices": [
-        {"id": 1, "text": "A programming language"},
-        {"id": 2, "text": "A snake"},
-        {"id": 3, "text": "A beverage"}
+        {"id": 1, "text": "A programming language", "selected": null, "correct": null},
+        {"id": 2, "text": "A snake", "selected": null, "correct": null},
+        {"id": 3, "text": "A beverage", "selected": null, "correct": null}
       ]
     }
-  ],
-  "passed": false
+  ]
 }
 ```
 
 **Response (200) - After Passing:**
 ```json
 {
-  "id": 1,
   "title": "Introduction Quiz",
   "questions_count": 5,
+  "passed": true,
   "questions": [
     {
-      "id": 1,
       "text": "What is Python?",
+      "order": 1,
       "choices": [
-        {"id": 1, "text": "A programming language", "is_correct": true},
-        {"id": 2, "text": "A snake", "is_correct": false},
-        {"id": 3, "text": "A beverage", "is_correct": false}
+        {"id": 1, "text": "A programming language", "selected": true, "correct": true},
+        {"id": 2, "text": "A snake", "selected": false, "correct": false},
+        {"id": 3, "text": "A beverage", "selected": false, "correct": false}
       ]
     }
-  ],
-  "passed": true,
-  "user_answers": {
-    "1": 1,
-    "2": 3
-  }
+  ]
 }
 ```
 
-**Note:** Correct answers only shown after passing.
+**Note:** Correct answers only shown after passing. The frontend quiz page currently does not consume this endpoint.
 
 ### Submit Quiz
 
@@ -467,12 +502,12 @@ def calculate_time_spent(user_profile):
 3. **No Resume:** Doesn't track last position in course
 4. **No Analytics:** No learning analytics (time per section, etc.)
 
-### Frontend (Missing)
+### Frontend
 
-1. **No Dashboard UI:** Backend exists, no frontend pages
-2. **No Video Player:** No lecture viewing interface
-3. **No Quiz UI:** No quiz taking interface
-4. **No Progress Visualization:** No progress bars/charts
+1. **Quiz UI Not Integrated:** Quiz and quiz result pages currently use mock data.
+2. **No Quiz API Hooks:** `getQuiz` and `submitQuiz` frontend API functions/hooks are not implemented.
+3. **Course Cards Navigation Gap:** Dashboard course cards render a continue/review button, but the shared card itself is not linked to `/dashboard/learn/{id}`.
+4. **Video Progress Missing:** Video playback exists, but watch position/progress tracking and auto-complete on video end are not implemented.
 
 ### Missing Features
 

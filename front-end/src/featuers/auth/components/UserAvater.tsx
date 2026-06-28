@@ -53,7 +53,7 @@ export function UserAvater() {
     const Logout = () => {
         DoLogout(undefined, {
             onSuccess: () => {
-                router.push('/login');
+                router.replace('/login');
             },
         });
     }
@@ -63,9 +63,9 @@ export function UserAvater() {
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon-lg" className="rounded-full">
-                <Avatar>
+                <Avatar className="bg-darkmint">
                     <AvatarImage src={user.profile_picture} alt="shadcn" />
-                    <AvatarFallback>LR</AvatarFallback>
+                    <AvatarFallback>{user?.first_name?.[0]}{user?.last_name?.[0]}</AvatarFallback>
                 </Avatar>
                 </Button>
             </DropdownMenuTrigger>
@@ -73,11 +73,11 @@ export function UserAvater() {
             <DropdownMenuContent align="end">
                 <DropdownMenuGroup>
                     
-                        <DropdownMenuItem onClick={() => router.push('dashboard/profile')} >
+                        <DropdownMenuItem onClick={() => router.replace('/dashboard/settings/profile')} >
                             <BadgeCheckIcon />
                             Profile
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => router.push('dashboard')}>
+                        <DropdownMenuItem onClick={() => router.replace('/dashboard')}>
                             <MdPestControl />
                             Dashboard
                         </DropdownMenuItem>

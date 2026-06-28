@@ -35,7 +35,7 @@ export function useProceedPayment() {
         onSuccess: () => {
             queryClient.removeQueries({ queryKey: ['order'] });
             toastsuccess('Payment completed successfully! Redirecting...');
-            router.push('/dashboard');
+            router.replace('/dashboard');
         },
         onError: (error: Error) => {
             const paymentError = getPaymentErrorMessage(error.message);

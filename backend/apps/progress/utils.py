@@ -14,6 +14,14 @@ def is_section_unlocked(user_profile, section):
     if not prev_section:
         return True
 
+    prev_quiz = getattr(prev_section, 'quiz', None)
+    if prev_quiz:
+        return QuizAttempt.objects.filter(
+            user=user_profile,
+            quiz=prev_quiz,
+            passed=True
+        ).exists()
+
     prev_section_lecture_ids = set(
         Lecture.objects.filter(section=prev_section).values_list('id', flat=True)
     )
@@ -93,6 +101,12 @@ def get_section_progress(user_profile, sections):
         ).values_list('quiz_id', flat=True)
     )
 
+    unlocked_quiz_ids = {
+        section.quiz.id
+        for section in sections
+        if getattr(section, 'quiz', None) and is_quiz_unlocked(user_profile, section.quiz)
+    }
+
     unlocked_lecture_ids = {
         lecture.id
         for section in sections
@@ -110,6 +124,7 @@ def get_section_progress(user_profile, sections):
         'completed_lecture_ids': completed_lecture_ids,
         'unlocked_lecture_ids': unlocked_lecture_ids,
         'passed_quiz_ids': passed_quiz_ids,
+        'unlocked_quiz_ids': unlocked_quiz_ids,
         'unlocked_section_ids': unlocked_section_ids,
     }
 
@@ -134,6 +149,8 @@ def get_student_sorted_courses(user, enrollments, completed_lectures):
         courses_data.append({
             'course'  : course,
             'progress': progress,
+            'total_lectures': total_count,
+            'lectures_completed': completed_count,
         })
 
     return sorted(

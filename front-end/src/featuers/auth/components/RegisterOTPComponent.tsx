@@ -34,16 +34,16 @@ export function OTPForm() {
     const verifyOTP: SubmitHandler<otpFormData> = (data) => {
         if (!!pendingEmail) useVerify({ ...data, email:pendingEmail} , {
             onSuccess(data, variables, onMutateResult, context) {
-                router.push('/dashboard/profile/')
+                router.replace('/dashboard/profile/')
             },
         })
-        if(!pendingEmail) router.push("/register/")
+        if(!pendingEmail) router.replace("/register/")
     }
 
 
     const ResendOTP = () => {
         if (!!pendingEmail) useResend({email : pendingEmail})
-        if(!pendingEmail) router.push("/register/")
+        if(!pendingEmail) router.replace("/register/")
     }
     
 

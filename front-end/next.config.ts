@@ -6,6 +6,7 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       new URL('https://res.cloudinary.com/**'),
       new URL('https://picsum.photos/**'),
+      new URL('https://lh3.googleusercontent.com/**'),
     ],
 
   }

@@ -17,7 +17,7 @@ export function GoogleLoginButton() {
                 code: codeResponse.code,
             } , {
                 onSuccess(data) {
-                    router.push("/")
+                    router.replace("/")
                 },
             });
         },

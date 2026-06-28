@@ -1,6 +1,6 @@
 # Student Progress Tracking - Tasks
 
-## Status: BACKEND COMPLETE / FRONTEND MISSING
+## Status: BACKEND IMPLEMENTED / FRONTEND PARTIALLY IMPLEMENTED
 
 ---
 
@@ -98,33 +98,50 @@
 
 ## Frontend Tasks
 
-### Dashboard Pages (Not Implemented)
-- [ ] /dashboard page
-  - [ ] Stats cards (completed, in-progress, time spent)
-  - [ ] Enrolled courses list
-  - [ ] Course progress bars
-  - [ ] Continue learning CTAs
-- [ ] /dashboard/courses page
-  - [ ] All enrolled courses
-  - [ ] Sort/filter enrolled courses
-- [ ] /dashboard/course/{id} page
-  - [ ] Course curriculum
-  - [ ] Section accordion
-  - [ ] Lecture list
-  - [ ] Quiz access
-  - [ ] Progress indicators
+### Dashboard Pages
 
-### Video Player (Not Implemented)
-- [ ] Video player component
-  - [ ] Cloudinary video playback
-  - [ ] Play/pause controls
-  - [ ] Progress bar
-  - [ ] Duration display
-  - [ ] Fullscreen toggle
-- [ ] Lecture completion button
-  - [ ] Mark complete action
+#### Student Dashboard Overview (IMPLEMENTED)
+- [x] /dashboard page
+  - [x] Stats cards (Total Enrolled, In Progress, Completed)
+  - [x] Enrolled courses list with progress bars
+  - [x] Overall progress circular indicator
+  - [x] Continue Learning banner
+  - [x] Learning Activity section (hours learned, lectures completed, courses completed)
+  - [x] Loading skeleton states
+  - [x] Empty state with "Browse Courses" CTA
+  - [x] Error state with retry button
+
+#### Enrolled Courses Page (IMPLEMENTED)
+- [x] /dashboard/my-courses page
+  - [x] All enrolled courses
+  - [x] Filter enrolled courses by all/in-progress/completed
+  - [x] Progress bars on course cards
+  - [x] Loading, error, and empty states
+
+#### Course Learning Page (IMPLEMENTED)
+- [x] /dashboard/learn/{id} page
+  - [x] Course curriculum data loading
+  - [x] Course progress indicator
+  - [x] Start/review learning CTA
+  - [x] Enrollment/forbidden access handling
+- [x] Learning sidebar
+  - [x] Section accordion
+  - [x] Lecture list
+  - [x] Quiz access links when unlocked
+  - [x] Locked section/lecture/quiz indicators
+  - [x] Progress indicators
+
+### Video Player / Lecture Page (PARTIALLY IMPLEMENTED)
+- [x] Lecture detail page `/dashboard/learn/{id}/lecture/{lectureId}`
+- [x] Native HTML video player using lecture `video_url`
+  - [x] Cloudinary/video URL playback
+  - [x] Browser-native play/pause controls
+  - [x] Browser-native duration display
+  - [x] Browser-native fullscreen support
+- [x] Lecture completion button
+  - [x] Mark complete action
   - [ ] Auto-complete on video end
-- [ ] Next/prev lecture navigation
+- [x] Next/prev lecture navigation
 
 ### Quiz UI (Not Implemented)
 - [ ] Quiz component
@@ -140,20 +157,31 @@
 - [ ] Quiz lock message
   - [ ] "Complete all lectures first"
 
-### Hooks (Not Implemented)
-- [ ] useDashboardOverview
-- [ ] useEnrolledCourses
-- [ ] useCourseProgress
-- [ ] useLectureComplete
+### Hooks
+
+#### Implemented
+- [x] useStudentDashboardOverview
+- [x] useStudentDashboardCourses
+- [x] useEnrolledStudentCourseOverview
+- [x] useEnrolledLectureDetail
+- [x] useMakeLectureCompleted
+
+#### Not Implemented
+- [ ] useEnrolledSectionDetail
 - [ ] useQuizData
 - [ ] useQuizSubmit
 
-### API Layer (Not Implemented)
-- [ ] progressAPI.getDashboardOverview
-- [ ] progressAPI.getEnrolledCourses
-- [ ] progressAPI.getCourseProgress
+### API Layer
+
+#### Implemented
+- [x] progressAPI.getStudentDashboardOverview
+- [x] progressAPI.getStudentDashboardCourses
+- [x] progressAPI.getEnrolledCourseOverview
+- [x] progressAPI.getEnrolledLectureDetail
+- [x] progressAPI.makeLectureCompleted
+
+#### Not Implemented
 - [ ] progressAPI.getSectionDetail
-- [ ] progressAPI.markLectureComplete
 - [ ] progressAPI.getQuiz
 - [ ] progressAPI.submitQuiz
 
@@ -167,12 +195,16 @@
 - [x] QuizAttemptAnswer → Question/Choice
 - [x] Enrollment check on all endpoints
 
-### Frontend Integration (Not Implemented)
-- [ ] Dashboard navigation
-- [ ] Course access from dashboard
-- [ ] Video player integration
+### Frontend Integration (Partially Implemented)
+- [x] Dashboard protected route
+- [x] My Courses route
+- [x] Learning route layout with sidebar
+- [x] Course learning overview API integration
+- [x] Lecture detail API integration
+- [x] Lecture completion persistence
+- [ ] Course cards/button navigation to learning route
 - [ ] Quiz flow integration
-- [ ] Progress persistence
+- [x] Lecture progress persistence
 
 ---
 
@@ -186,8 +218,10 @@
 - [ ] Integration test: Quiz submission
 - [ ] Integration test: Sequential locking
 
-### Frontend Tests (Not Applicable - Not Implemented)
+### Frontend Tests
 - [ ] Video player tests
+- [ ] Lecture completion tests
+- [ ] Learning sidebar tests
 - [ ] Quiz form tests
 - [ ] Progress calculation tests
 
@@ -200,6 +234,13 @@
 - [ ] No resume position tracking
 - [ ] No time spent analytics
 - [ ] Quiz pass threshold hardcoded (should be per-quiz)
+- [ ] API responses do not yet use the project-wide `{ "data": {}, "status": 200 }` wrapper
+- [ ] Missing request fields can raise raw `KeyError` in lecture/quiz write endpoints
+
+### Frontend
+- [ ] Quiz and quiz result pages use mock data
+- [ ] Dashboard course-card CTA is not wired as a link to `/dashboard/learn/{id}`
+- [ ] No video auto-complete on playback end
 
 ### Missing Features
 - [ ] Certificate generation
@@ -214,4 +255,5 @@
 ## Documentation Tasks
 - [x] API endpoint documentation
 - [x] Data flow documentation
-- [ ] Frontend integration guide (pending implementation)
+- [x] Frontend integration documentation for implemented dashboard/course/lecture flow
+- [ ] Frontend quiz integration guide (pending implementation)

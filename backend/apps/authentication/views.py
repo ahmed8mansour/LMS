@@ -1,11 +1,14 @@
+import hashlib
+
 from django.shortcuts import render
 from django.http import HttpResponse
 from rest_framework.response import Response
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 
 
 from rest_framework import mixins, permissions , generics
 from rest_framework.views import APIView
+from rest_framework.parsers import MultiPartParser, FormParser
 
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -19,6 +22,7 @@ from .models import CustomUser
 from .serializers import   GoogleLoginSerializer,GoogleRegisterSerializer, UserForgetPasswordSetnewoneSerializer ,UserForgetPasswordVerifyOTPSerializer, CustomUserRegisterSendOTPSerializer , UserDataSerializer  , UserLoginSerializer , UserSetPasswordSerializer , UserChangePasswordSerializer , UserRegisterVerifyOTPSerializer , UserResnedOTPSerializer , UserForgetPasswordSendOTPSerializer, GoogleSetPasswordSendOTPSerializer, GoogleSetPasswordVerifyOTPSerializer, GoogleSetPasswordNewPasswordSerializer
 from .utils import send_otp_email, set_jwt_cookies, clear_jwt_cookies, CookieJWTAuthentication, set_password_reset_token_cookie, clear_password_reset_token_cookie
 # Create your views here.
+import logging
 
 # social login imports
 from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
@@ -29,9 +33,10 @@ from allauth.socialaccount.providers.oauth2.views import OAuth2LoginView
 
 from django.conf import settings
 
-from allauth.socialaccount.models import SocialAccount
-from django.contrib.auth import get_user_model
-import requests
+import time
+
+logger = logging.getLogger(__name__)
+
 
 class UserRegisterSendOTPView(APIView):
     # body: {
@@ -173,20 +178,47 @@ class UserProfileView(APIView):
         serializer = UserDataSerializer(user)
         return Response(serializer.data , status= status.HTTP_200_OK)
 
+class CloudinarySignatureView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        timestamp = int(time.time())
+        
+        api_secret = settings.CLOUDINARY_STORAGE['API_SECRET']
+        api_key = settings.CLOUDINARY_STORAGE['API_KEY']
+        cloud_name = settings.CLOUDINARY_STORAGE['CLOUD_NAME']
+        
+        params = f"timestamp={timestamp}{api_secret}"
+        signature = hashlib.sha1(params.encode()).hexdigest()
+        
+        return Response({
+            'signature': signature,
+            'timestamp': timestamp,
+            'api_key': api_key,
+            'cloud_name': cloud_name,
+        })
+
 class UserProfileUpdateView(APIView):
     permission_classes = [permissions.IsAuthenticated]
-    authentication_classes = [JWTAuthentication]
+    authentication_classes = [CookieJWTAuthentication]
     # body:{data}
     # header:{access token}
 
     def put(self , request):
         user = request.user
+        logger.debug(">>> Request received")
+        logger.debug(f">>> FILES: {request.FILES}")
+        logger.debug(f">>> DATA: {request.data}")
         serizalizer = UserDataSerializer(instance= user , data= request.data , partial=True)
         if serizalizer.is_valid():
             serizalizer.save()
+            logger.debug(">>> Response sent done")
             return Response(serizalizer.data , status=status.HTTP_200_OK)
+        logger.debug(">>> Response sent error")
+        logger.debug(f">>> {serizalizer.errors}")
         return Response(serizalizer.errors , status= status.HTTP_404_NOT_FOUND)
     
+
 
 class UserLoginView(APIView):
     permission_classes = [permissions.AllowAny]
@@ -209,7 +241,7 @@ class UserLoginView(APIView):
 
 class UserChangePasswordView(APIView):
     permission_classes = [permissions.IsAuthenticated]
-    authentication_classes = [JWTAuthentication]
+    authentication_classes = [CookieJWTAuthentication]
 
     # header {access_token}
     # body{old_password , new_password , new_password_confirm}
@@ -330,13 +362,15 @@ class GoogleSetPasswordSendOTPView(APIView):
     Body: {} (empty - uses authenticated user)
     """
     permission_classes = [permissions.IsAuthenticated]
-    authentication_classes = [JWTAuthentication]
+    authentication_classes = [CookieJWTAuthentication]
     
     def post(self, request):
         serializer = GoogleSetPasswordSendOTPSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
             result = serializer.save()
-            return Response(result, status=status.HTTP_200_OK)
+            response = Response(result, status=status.HTTP_200_OK)
+            response = clear_password_reset_token_cookie(response)
+            return response
         else:
             error = serializer.errors
             return Response(error, status=status.HTTP_400_BAD_REQUEST)
@@ -352,13 +386,17 @@ class GoogleSetPasswordVerifyOTPView(APIView):
     }
     """
     permission_classes = [permissions.IsAuthenticated]
-    authentication_classes = [JWTAuthentication]
+    authentication_classes = [CookieJWTAuthentication]
 
     def post(self, request):
         serializer = GoogleSetPasswordVerifyOTPSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
             result = serializer.save()
-            return Response(result, status=status.HTTP_200_OK)
+            response = Response(result, status=status.HTTP_200_OK)
+            reset_token = serializer.context.get('reset_token')
+            if reset_token:
+                response = set_password_reset_token_cookie(response, reset_token)
+            return response
         else:
             error = serializer.errors
             return Response(error, status=status.HTTP_400_BAD_REQUEST)
@@ -375,14 +413,18 @@ class GoogleSetPasswordNewPasswordView(APIView):
     }
     """
     permission_classes = [permissions.IsAuthenticated]
-    authentication_classes = [JWTAuthentication]
+    authentication_classes = [CookieJWTAuthentication]
 
     def post(self, request):
-        serializer = GoogleSetPasswordNewPasswordSerializer(data=request.data, context={'request': request})
+        reset_token = request.COOKIES.get('password_reset_token', None)
+        serializer = GoogleSetPasswordNewPasswordSerializer(
+            data=request.data,
+            context={'request': request, 'reset_token': reset_token}
+        )
         if serializer.is_valid():
             result = serializer.save()
             response = Response(result, status=status.HTTP_200_OK)
-            # Set JWT cookies (refresh tokens for password-authenticated login)
+            response = clear_password_reset_token_cookie(response)
             user = serializer.validated_data['user']
             response = set_jwt_cookies(response, user)
             return response

@@ -24,11 +24,13 @@ The Course Discovery feature provides the public-facing interface for students t
 **Purpose**: Landing page showcasing platform value proposition and featured courses.
 
 **Components:**
+
 - `Hero`: Value proposition and CTA
 - `HomePageCoursesSection`: Filterable course carousel
 - `ServicesSection`: Platform features/benefits
 
 **Features:**
+
 - Category filter tabs (All, Development, Business, Design, Marketing)
 - Displays 3 featured courses per category
 - "View all courses" link to course listing
@@ -38,6 +40,7 @@ The Course Discovery feature provides the public-facing interface for students t
 **Purpose**: Browse all courses with advanced filtering.
 
 **Layout:**
+
 ```
 ┌─────────────────────────────────────────────┐
 │  Header: Explore Courses (120+ available)   │
@@ -57,12 +60,14 @@ The Course Discovery feature provides the public-facing interface for students t
 ```
 
 **Filters Available:**
+
 - **Category**: Development, Business, Design & UI/UX, Marketing
 - **Level**: Beginner, Intermediate, Advanced
 - **Price Range**: $0 - $1000+ slider
 - **Rating**: 4.5+, 4.0+, 3.0+
 
 **Sort Options:**
+
 - Newest (default)
 - Most Popular
 - Price: Low to High
@@ -73,6 +78,7 @@ The Course Discovery feature provides the public-facing interface for students t
 **Purpose**: Display complete course information and enrollment CTA.
 
 **Layout:**
+
 ```
 ┌─────────────────────────────────────────────┐
 │  Course Thumbnail with Overlay              │
@@ -99,6 +105,7 @@ The Course Discovery feature provides the public-facing interface for students t
 ```
 
 **Conditional Display:**
+
 - If enrolled: Show "Continue Learning" button linking to dashboard
 - If not enrolled: Show "Enroll Now" with pricing
 
@@ -108,27 +115,27 @@ The Course Discovery feature provides the public-facing interface for students t
 
 ### Course Discovery Endpoints
 
-| Endpoint | Method | Auth | Description |
-|----------|--------|------|-------------|
-| `/courses/student/homepage/` | GET | No | Featured courses for homepage |
-| `/courses/student/courses/` | GET | No | List courses with filters/pagination |
-| `/courses/student/courses/{id}/` | GET | Optional | Course detail with enrollment status |
+| Endpoint                         | Method | Auth     | Description                          |
+| -------------------------------- | ------ | -------- | ------------------------------------ |
+| `/courses/student/homepage/`     | GET    | No       | Featured courses for homepage        |
+| `/courses/student/courses/`      | GET    | No       | List courses with filters/pagination |
+| `/courses/student/courses/{id}/` | GET    | Optional | Course detail with enrollment status |
 
 ### Query Parameters
 
 #### List Endpoint (`/courses/student/courses/`)
 
-| Param | Type | Multiple | Description | Example |
-|-------|------|----------|-------------|---------|
-| `category` | string | Yes | Filter by category | `?category=development&category=business` |
-| `level` | string | No | Filter by level | `?level=beginner` |
-| `min_price` | decimal | No | Minimum price | `?min_price=10` |
-| `max_price` | decimal | No | Maximum price | `?max_price=100` |
-| `rating` | decimal | No | Minimum rating | `?rating=4.0` |
-| `search` | string | No | Search term | `?search=python` |
-| `sort` | string | No | Sort order | `?sort=popular` |
-| `cursor` | string | No | Pagination cursor | `?cursor=cD0y` |
-| `page_size` | integer | No | Items per page | `?page_size=10` |
+| Param       | Type    | Multiple | Description        | Example                                   |
+| ----------- | ------- | -------- | ------------------ | ----------------------------------------- |
+| `category`  | string  | Yes      | Filter by category | `?category=development&category=business` |
+| `level`     | string  | No       | Filter by level    | `?level=beginner`                         |
+| `min_price` | decimal | No       | Minimum price      | `?min_price=10`                           |
+| `max_price` | decimal | No       | Maximum price      | `?max_price=100`                          |
+| `rating`    | decimal | No       | Minimum rating     | `?rating=4.0`                             |
+| `search`    | string  | No       | Search term        | `?search=python`                          |
+| `sort`      | string  | No       | Sort order         | `?sort=popular`                           |
+| `cursor`    | string  | No       | Pagination cursor  | `?cursor=cD0y`                            |
+| `page_size` | integer | No       | Items per page     | `?page_size=10`                           |
 
 #### Sort Values
 
@@ -143,40 +150,40 @@ The Course Discovery feature provides the public-facing interface for students t
 
 ### Discovery Components
 
-| Component | Location | Purpose |
-|-----------|----------|---------|
-| `Hero` | `components/organisms/Hero.tsx` | Homepage hero section |
+| Component                | Location                                                 | Purpose                           |
+| ------------------------ | -------------------------------------------------------- | --------------------------------- |
+| `Hero`                   | `components/organisms/Hero.tsx`                          | Homepage hero section             |
 | `HomePageCoursesSection` | `features/courses/components/HomePageCoursesSection.tsx` | Homepage course grid with filters |
-| `HomeRadioGroup` | `components/molecules/HomeRadioGroup.tsx` | Category filter tabs |
-| `Filters` | `components/molecules/Filters.tsx` | Sidebar filters on listing page |
-| `SearchAndSort` | `components/molecules/SearchAndSort.tsx` | Search bar + sort dropdown |
-| `CourseCard` | `components/molecules/CourseCard.tsx` | Course preview card |
-| `CourseCardSkeleton` | `components/molecules/CourseCardSkeleton.tsx` | Loading placeholder |
-| `CoursesCards` | `features/courses/components/courses/CoursesCards.tsx` | Grid container |
-| `ServicesSection` | `components/organisms/ServicesSection.tsx` | Platform features |
+| `HomeRadioGroup`         | `components/molecules/HomeRadioGroup.tsx`                | Category filter tabs              |
+| `Filters`                | `components/molecules/Filters.tsx`                       | Sidebar filters on listing page   |
+| `SearchAndSort`          | `components/molecules/SearchAndSort.tsx`                 | Search bar + sort dropdown        |
+| `CourseCard`             | `components/molecules/CourseCard.tsx`                    | Course preview card               |
+| `CourseCardSkeleton`     | `components/molecules/CourseCardSkeleton.tsx`            | Loading placeholder               |
+| `CoursesCards`           | `features/courses/components/courses/CoursesCards.tsx`   | Grid container                    |
+| `ServicesSection`        | `components/organisms/ServicesSection.tsx`               | Platform features                 |
 
 ### Detail Page Components
 
-| Component | Location | Purpose |
-|-----------|----------|---------|
-| `CourseDetailPage` | `features/courses/components/CourseDetailPage/courseid/CourseDetailPage.tsx` | Main detail layout |
-| `CourseHero` | `features/courses/components/CourseDetailPage/courseid/CourseHero.tsx` | Header with metadata |
-| `CourseGoals` | `features/courses/components/CourseDetailPage/courseid/CourseGoals.tsx` | Learning objectives list |
-| `CourseSections` | `features/courses/components/CourseDetailPage/courseid/CourseSections.tsx` | Curriculum accordion |
-| `CourseInstructor` | `features/courses/components/CourseDetailPage/courseid/CourseInstructor.tsx` | Instructor bio card |
-| `CourseEnrollCard` | `features/courses/components/CourseDetailPage/courseid/CourseEnrollCard.tsx` | Enrollment CTA (sticky) |
-| `CourseFeedback` | `features/courses/components/CourseDetailPage/courseid/CourseFeedback.tsx` | Rating/reviews display |
+| Component          | Location                                                                     | Purpose                  |
+| ------------------ | ---------------------------------------------------------------------------- | ------------------------ |
+| `CourseDetailPage` | `features/courses/components/CourseDetailPage/courseid/CourseDetailPage.tsx` | Main detail layout       |
+| `CourseHero`       | `features/courses/components/CourseDetailPage/courseid/CourseHero.tsx`       | Header with metadata     |
+| `CourseGoals`      | `features/courses/components/CourseDetailPage/courseid/CourseGoals.tsx`      | Learning objectives list |
+| `CourseSections`   | `features/courses/components/CourseDetailPage/courseid/CourseSections.tsx`   | Curriculum accordion     |
+| `CourseInstructor` | `features/courses/components/CourseDetailPage/courseid/CourseInstructor.tsx` | Instructor bio card      |
+| `CourseEnrollCard` | `features/courses/components/CourseDetailPage/courseid/CourseEnrollCard.tsx` | Enrollment CTA (sticky)  |
+| `CourseFeedback`   | `features/courses/components/CourseDetailPage/courseid/CourseFeedback.tsx`   | Rating/reviews display   |
 
 ---
 
 ## Hooks
 
-| Hook | Location | Purpose |
-|------|----------|---------|
-| `usePaginatedCourses` | `features/courses/hooks/usePaginatedCourses.tsx` | Infinite scroll course list |
-| `useCourse` | `features/courses/hooks/useCourse.tsx` | Single course fetch |
-| `useCourseStats` | `features/courses/hooks/useCourseStats.tsx` | Calculate duration/lecture counts |
-| `useDebounce` | `hooks/useDebounce.tsx` | Debounce search input |
+| Hook                  | Location                                         | Purpose                           |
+| --------------------- | ------------------------------------------------ | --------------------------------- |
+| `usePaginatedCourses` | `features/courses/hooks/usePaginatedCourses.tsx` | Infinite scroll course list       |
+| `useCourse`           | `features/courses/hooks/useCourse.tsx`           | Single course fetch               |
+| `useCourseStats`      | `features/courses/hooks/useCourseStats.tsx`      | Calculate duration/lecture counts |
+| `useDebounce`         | `hooks/useDebounce.tsx`                          | Debounce search input             |
 
 ---
 
@@ -253,14 +260,17 @@ Filters are managed via React Query's queryKey:
 
 ```typescript
 // Query key includes all filter state
-queryKey: ['courses', {
-    category: ['development'],
-    level: 'beginner',
+queryKey: [
+  "courses",
+  {
+    category: ["development"],
+    level: "beginner",
     min_price: 10,
     max_price: 100,
-    search: 'python',
-    sort: 'popular'
-}]
+    search: "python",
+    sort: "popular",
+  },
+];
 ```
 
 When filters change, new query is triggered automatically.
@@ -277,10 +287,14 @@ const router = useRouter();
 const filters = router.query; // ?category=development&level=beginner
 
 // Update URL on filter change
-router.push({
-    pathname: '/courses',
-    query: { category: selectedCategory }
-}, undefined, { shallow: true });
+router.replace(
+  {
+    pathname: "/courses",
+    query: { category: selectedCategory },
+  },
+  undefined,
+  { shallow: true },
+);
 ```
 
 ### Debounced Search
@@ -288,7 +302,7 @@ router.push({
 Search input is debounced to prevent excessive API calls:
 
 ```typescript
-const [searchTerm, setSearchTerm] = useState('');
+const [searchTerm, setSearchTerm] = useState("");
 const debouncedSearch = useDebounce(searchTerm, 500); // 500ms delay
 
 // Use debouncedSearch in query
@@ -380,11 +394,11 @@ const debouncedSearch = useDebounce(searchTerm, 500); // 500ms delay
 
 ### Breakpoints
 
-| Breakpoint | Layout |
-|------------|--------|
-| Mobile (<640px) | Single column cards, filters as sheet/modal |
+| Breakpoint          | Layout                                      |
+| ------------------- | ------------------------------------------- |
+| Mobile (<640px)     | Single column cards, filters as sheet/modal |
 | Tablet (640-1024px) | 2-column cards, filters sidebar collapsible |
-| Desktop (>1024px) | 3-column cards, filters sidebar visible |
+| Desktop (>1024px)   | 3-column cards, filters sidebar visible     |
 
 ### Responsive Patterns
 
@@ -423,6 +437,7 @@ w-full /* Mobile (stacked) */
 ## Dependencies
 
 ### Frontend
+
 - `@tanstack/react-query` - Server state management
 - `axios` - HTTP client
 - `lucide-react` - Icons

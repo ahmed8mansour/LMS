@@ -140,27 +140,38 @@ Return Dashboard Data
 
 ```
 Student
-  │-- Click "Mark Complete"
+  │-- Open /dashboard/learn/{course_id}/lecture/{lecture_id}
+  │-- Frontend requests lecture detail
   ▼
 Backend
   │-- Verify enrollment
   │-- Verify lecture is unlocked
-  │-- Create/update LectureProgress
-  │-- Update course progress
+  │-- Return lecture metadata and video_url
+  ▼
+Frontend
+  │-- Render native HTML video player
+  │-- Student clicks "Mark Complete"
+  ▼
+Backend
+  │-- Verify enrollment
+  │-- Verify lecture is unlocked
+  │-- Create/update LectureProgress from lecture_id
   │
   ▼
 Return Updated Status
-  │-- New progress percentage
-  │-- Next lecture unlocked
+  │-- lecture_id, is_completed, completed_at, already_completed
+  │-- Frontend invalidates dashboard/course queries
 ```
 
 ### Quiz Submission Flow
 
 ```
 Student
-  │-- Submit Quiz Answers
+  │-- Opens quiz page
+  │-- Current frontend displays mock quiz content only
   ▼
 Backend
+  │-- API exists for real submission, but frontend is not integrated yet
   │-- Verify quiz is unlocked
   │-- Validate all questions answered
   │-- Grade each answer:
@@ -281,6 +292,8 @@ progress = (completed / total * 100) if total > 0 else 0
 1. **Progress Calculation:** O(N) queries per course
 2. **No Caching:** Progress recalculated on every request
 3. **No Indexing:** Limited indexes on progress tables
+4. **Response Contract Drift:** Progress endpoints currently return raw payloads instead of the project-wide `{ "data": {}, "status": 200 }` wrapper
+5. **Frontend Quiz Gap:** Quiz pages exist but are still mock-data UI and do not call the quiz APIs
 
 ### Future Improvements
 
@@ -365,6 +378,7 @@ apps/progress/
 │   ├── StudentDashboardCourses
 │   ├── EnrolledCourseDetailView
 │   ├── EnrolledSectionDetailView
+│   ├── EnrolledLectureDetailView
 │   ├── MarkLectureCompleteView
 │   ├── SubmitQuizView
 │   └── QuizEnrolledStudentView
@@ -379,26 +393,37 @@ apps/progress/
 └── urls.py
 ```
 
-### Frontend (Not Implemented)
+### Frontend
+
+#### Student Dashboard, Course, and Lecture Flow (IMPLEMENTED / PARTIAL)
 ```
 featuers/progress/
 ├── api/
-│   └── progress.api.ts
+│   └── progress.api.ts            # overview, courses, course detail, lecture detail, mark complete
 ├── components/
-│   ├── Dashboard.tsx
-│   ├── CourseProgress.tsx
-│   ├── SectionAccordion.tsx
-│   ├── LectureList.tsx
-│   ├── VideoPlayer.tsx
-│   ├── QuizTaker.tsx
-│   └── QuizResults.tsx
+│   └── student/
+│       ├── dashboardoverview.tsx  # DashboardPage, StatCard, DashboardCourseCard
+│       ├── DashboardCourses.tsx   # /dashboard/my-courses list and filters
+│       ├── CourseContent.tsx      # /dashboard/learn/{id} overview
+│       ├── LearnSideBar.tsx       # learning navigation and locks
+│       ├── LectureContent.tsx     # lecture video page
+│       └── MarkLectureComplete.tsx
 ├── hooks/
-│   ├── useDashboard.ts
-│   ├── useCourseProgress.ts
-│   ├── useLectureComplete.ts
-│   └── useQuiz.ts
+│   ├── useStudentDashboardOverview.tsx
+│   ├── useStudentDashboardCourses.tsx
+│   ├── useEnrolledStudentCourseOverView.tsx
+│   ├── useEnrolledLectureDetail.tsx
+│   └── useMakeLectureComplete.tsx
 └── types/
-    └── progress.types.ts
+    └── progress.types.ts          # dashboard, course, section, lecture interfaces
+```
+
+#### Quiz Flow (Not Integrated)
+```
+app/dashboard/learn/[id]/quiz/[quizId]/page.tsx          # mock quiz UI only
+app/dashboard/learn/[id]/quiz/[quizId]/result/page.tsx   # mock quiz result UI only
+featuers/progress/api/progress.api.ts                    # missing getQuiz(), submitQuiz()
+featuers/progress/hooks/                                 # missing quiz query/mutation hooks
 ```
 
 ---

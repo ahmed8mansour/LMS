@@ -26,7 +26,7 @@ export default function CourseEnrollCard({price , totalHourse}:props) {
         DoCreatePaymentIntent(id as string,{
                 onSuccess : (data)=>{
                     // Navigate to checkout page with order ID in URL
-                    router.push(`/courses/checkout/${data.order.id}/`)
+                    router.replace(`/courses/checkout/${data.order.id}/`)
                 }
             }
         )
