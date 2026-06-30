@@ -223,7 +223,7 @@ class QuestionDataSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Question
-        fields=['text','order' , 'choices']
+        fields=['id', 'text','order' , 'choices']
     
     def get_choices(self , obj ):
         choices = obj.choice.all()

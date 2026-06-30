@@ -329,10 +329,12 @@ class SubmitQuizView(APIView):
         serializer.is_valid(raise_exception=True)
         answers_data = serializer.validated_data['answers']
 
-        questions = Question.objects.filter(quiz=quiz).prefetch_related('choice_set')
+        questions = Question.objects.filter(quiz=quiz).prefetch_related('choice')
         question_map = {q.id: q for q in questions}
         question_ids = set(question_map.keys())
 
+        # check if the questions number sent from the frontend matches the number of questions
+        # -- using set properities
         submitted_question_ids = set(a['question_id'] for a in answers_data)
         if submitted_question_ids != question_ids:
             missing = question_ids - submitted_question_ids
@@ -345,14 +347,16 @@ class SubmitQuizView(APIView):
             return Response(errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+        # store the REAL question with their choices in a set of tuple 
         choice_map = {}
         correct_choices = {}
         for question in questions:
-            for choice in question.choice_set.all():
+            for choice in question.choice.all():
                 choice_map[(question.id , choice.id)] = choice
                 if choice.is_correct:
                     correct_choices[(question.id , choice.id)] = choice
 
+        # check if the choices belongs to questions
         for answer in answers_data:
             if (answer['question_id'] , answer['choice_id']) not in choice_map:
                 return Response(
@@ -360,6 +364,7 @@ class SubmitQuizView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
+        # getting the score 
         correct_count = 0
         results = []
         for answer in answers_data:
