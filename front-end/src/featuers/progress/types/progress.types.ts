@@ -109,5 +109,52 @@ export interface LectureCompletionResponse {
     is_completed: boolean,
     completed_at: string
     already_completed: boolean
+}
 
+// ─── Quiz Flow ───────────────────────────────────────────────────────────────
+
+export interface QuizChoice {
+    id: number
+    text: string
+    selected: boolean | null
+    correct: boolean | null
+}
+
+export interface QuizQuestion {
+    id: number
+    text: string
+    order: number
+    choices: QuizChoice[]
+}
+
+export interface QuizDetail {
+    title: string
+    questions_count: number
+    passed: boolean
+    questions: QuizQuestion[]
+}
+
+export interface QuizAnswer {
+    question_id: number
+    choice_id: number
+}
+
+export interface QuizSubmission {
+    quiz_id: number
+    answers: QuizAnswer[]
+}
+
+export interface QuizResultItem {
+    question_id: number
+    selected_choice_id: number
+    is_correct: boolean
+}
+
+export interface QuizResult {
+    quiz_id: number
+    score: number
+    passed: boolean
+    total_questions: number
+    correct_answers: number
+    results: QuizResultItem[]
 }

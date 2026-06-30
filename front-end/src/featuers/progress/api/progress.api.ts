@@ -1,5 +1,5 @@
 import axiosInstance from '@/lib/axios';
-import { StudentOverview , StudentCourses , EnrolledCourseOveview , EnrolledLectureDetail  , LectureCompletionResponse } from '../types/progress.types';
+import { StudentOverview , StudentCourses , EnrolledCourseOveview , EnrolledLectureDetail  , LectureCompletionResponse, QuizDetail, QuizSubmission, QuizResult } from '../types/progress.types';
 
 async function getStudentDashboardOverview(): Promise<StudentOverview> {
     const { data } = await axiosInstance.get('progress/student/overview/');
@@ -37,15 +37,22 @@ async function makeLectureCompleted(LectureID:string|number): Promise<LectureCom
 
 }
 
-// async function getOrderDetail(orderId: string): Promise<OrderDetails> {
-//     const { data } = await axios.post('enrollment/get-order-details/', { order_id: orderId });
-//     return data;
-// }
+async function getQuiz(quizId: string | number): Promise<QuizDetail> {
+    const { data } = await axiosInstance.get(`progress/student/learn/quiz/${quizId}/`);
+    return data;
+}
+
+async function submitQuiz(payload: QuizSubmission): Promise<QuizResult> {
+    const { data } = await axiosInstance.post('progress/student/learn/quiz/makeattempt/', payload);
+    return data;
+}
 
 export const progressAPI = {
     getStudentDashboardOverview,
     getStudentDashboardCourses,
     getEnrolledCourseOverview,
     getEnrolledLectureDetail,
-    makeLectureCompleted
+    makeLectureCompleted,
+    getQuiz,
+    submitQuiz,
 };
