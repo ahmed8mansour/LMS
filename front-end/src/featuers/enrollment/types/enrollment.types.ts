@@ -20,3 +20,27 @@ export interface OrderDetails {
     course: Course
     status: 'pending' | 'paid' | 'failed' | 'refunded'
 }
+
+
+export interface BillingSummary {
+    total_spent: string
+    courses_purchased: number
+    last_payment_date: string | null
+}
+
+export interface OrderHistoryItem {
+    id: string
+    course_name: string
+    amount: string
+    currency: string
+    status: 'paid' | 'refunded'
+    method: string
+    date: string
+}
+
+export interface OrdersPage {
+    count: number
+    next: string | null
+    previous: string | null
+    results: OrderHistoryItem[]
+}

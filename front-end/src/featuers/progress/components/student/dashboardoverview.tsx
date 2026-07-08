@@ -196,9 +196,11 @@ export function DashboardPage() {
                                 <span>{courses[0].progress}% Completed</span>
                                 <span>{courses[0].progress === 100 ? "Completed" : "Keep going!"}</span>
                             </div>
-                            <Button variant="darkmint" size="lg" className="gap-2">
-                                {courses[0].progress === 100 ? "Review Course" : "Resume Learning"}
-                                <ArrowRight size={16} />
+                            <Button asChild variant="darkmint" size="lg" className="gap-2">
+                                <Link href={`/dashboard/learn/${courses[0].id}`}>
+                                    {courses[0].progress === 100 ? "Review Course" : "Resume Learning"}
+                                    <ArrowRight size={16} />
+                                </Link>
                             </Button>
                         </div>
                     </div>
@@ -209,8 +211,8 @@ export function DashboardPage() {
             <section className="mb-10">
                 <div className="flex justify-between items-center mb-6">
                     <h3 className="text-xl font-bold text-darktext">My Recent Courses</h3>
-                    <Button variant="ghost" className="text-darkmint hover:bg-darkmint/10">
-                        View All
+                    <Button asChild variant="ghost" className="text-darkmint hover:bg-darkmint/10">
+                        <Link href="/dashboard/my-courses">View All</Link>
                     </Button>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

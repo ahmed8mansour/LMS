@@ -293,7 +293,7 @@ progress = (completed / total * 100) if total > 0 else 0
 2. **No Caching:** Progress recalculated on every request
 3. **No Indexing:** Limited indexes on progress tables
 4. **Response Contract Drift:** Progress endpoints currently return raw payloads instead of the project-wide `{ "data": {}, "status": 200 }` wrapper
-5. **Frontend Quiz Gap:** Quiz pages exist but are still mock-data UI and do not call the quiz APIs
+5. ~~**Frontend Quiz Gap**~~ — **RESOLVED.** Quiz pages (`/quiz/[quizId]`, `/quiz/[quizId]/result`) are fully wired to `GET /learn/quiz/{id}/` and `POST /learn/quiz/makeattempt/`.
 
 ### Future Improvements
 
@@ -424,6 +424,38 @@ app/dashboard/learn/[id]/quiz/[quizId]/page.tsx          # mock quiz UI only
 app/dashboard/learn/[id]/quiz/[quizId]/result/page.tsx   # mock quiz result UI only
 featuers/progress/api/progress.api.ts                    # missing getQuiz(), submitQuiz()
 featuers/progress/hooks/                                 # missing quiz query/mutation hooks
+```
+
+#### Billing Subfeature (IMPLEMENTED)
+
+Billing is a subfeature of Student Progress, but the code lives in the `enrollment` app/feature
+since that's where `Order`/`Transaction` are already owned — not under `apps/progress/` or
+`featuers/progress/`.
+
+```
+apps/enrollment/                       # backend home for billing
+├── models.py            # Order.created_at, Transaction.created_at (new fields, migration 0011)
+├── pagination.py         # BillingPageNumberPagination (page_size=6)
+├── serializers.py        # BillingSummarySerializer, StudentOrderHistorySerializer
+├── views.py              # StudentBillingSummaryView, StudentOrderHistoryView
+└── urls.py                # student/billing/summary/, student/orders/
+
+featuers/enrollment/                   # frontend home for billing (no separate billing.api.ts /
+                                        # billing.types.ts — added to the existing single
+                                        # enrollment.api.ts / enrollment.types.ts, matching how
+                                        # featuers/progress bundles multiple domains in one file)
+├── api/enrollment.api.ts        # + enrollmentAPI.getBillingSummary, getBillingOrders
+├── types/enrollment.types.ts    # + BillingSummary, OrderHistoryItem, OrdersPage
+├── hooks/
+│   ├── useBillingSummary.tsx
+│   └── useStudentOrders.tsx
+└── components/billing/
+    ├── BillingSummary.tsx      # payment summary stat cards
+    └── TransactionHistory.tsx  # order table + pagination
+
+app/dashboard/(main)/settings/billing/page.tsx
+# composes BillingSummary + TransactionHistory; the static Tax Invoice / Contact Support
+# cards are hardcoded directly in the page (too small/static to extract into a component)
 ```
 
 ---

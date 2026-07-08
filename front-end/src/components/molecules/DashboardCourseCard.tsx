@@ -4,6 +4,7 @@ import { Button } from "@/components/atoms/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/atoms/avatar";
 import { CheckCircle, Play } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 
 interface DashboardCourseCardProps {
     id: string;
@@ -25,7 +26,7 @@ export function DashboardCourseCard({
     isCompleted = false,
 }: DashboardCourseCardProps) {
     return (
-        <div className="bg-white rounded-xl border border-graytext/20 overflow-hidden hover:shadow-md transition-shadow group cursor-pointer">
+        <Link href={`/dashboard/learn/${id}`} className="bg-white rounded-xl border border-graytext/20 overflow-hidden hover:shadow-md transition-shadow group cursor-pointer block">
             <div className="h-40 overflow-hidden relative">
                 <Image
                     src={imageUrl}
@@ -68,6 +69,7 @@ export function DashboardCourseCard({
                     variant={isCompleted ? "outline" : "darkmint"}
                     size="sm"
                     className="w-full gap-2"
+                    tabIndex={-1}
                 >
                     {isCompleted ? (
                         <>
@@ -82,6 +84,6 @@ export function DashboardCourseCard({
                     )}
                 </Button>
             </div>
-        </div>
+        </Link>
     );
 }

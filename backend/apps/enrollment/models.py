@@ -15,6 +15,7 @@ class Order(models.Model):
         ("USD","USD"),
     })
     stripe_payment_intent_id = models.TextField(null=False , blank=False)
+    created_at = models.DateTimeField(auto_now_add=True , null=True)
 
 
 class Transaction(models.Model):
@@ -32,7 +33,8 @@ class Transaction(models.Model):
     stripe_payment_intent_id = models.TextField(null=False , blank=False)
     stripe_charge_id = models.TextField(null=False , blank=False)
     stripe_receipt_id = models.TextField(null=False , blank=False)
-    
+    created_at = models.DateTimeField(auto_now_add=True , null=True)
+
 
 class Enrollment(models.Model):
     course  = models.ForeignKey('course.Course' , on_delete=models.CASCADE)

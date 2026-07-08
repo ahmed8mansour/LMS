@@ -91,3 +91,26 @@ class EnrollmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Enrollment
         fields = '__all__'
+
+
+class BillingSummarySerializer(serializers.Serializer):
+    total_spent = serializers.DecimalField(max_digits=10, decimal_places=2)
+    courses_purchased = serializers.IntegerField()
+    last_payment_date = serializers.DateTimeField(allow_null=True)
+
+
+class StudentOrderHistorySerializer(serializers.ModelSerializer):
+    id = serializers.SerializerMethodField()
+    course_name = serializers.CharField(source='course.title')
+    method = serializers.SerializerMethodField()
+    date = serializers.DateTimeField(source='created_at')
+
+    class Meta:
+        model = Order
+        fields = ['id', 'course_name', 'amount', 'currency', 'status', 'method', 'date']
+
+    def get_id(self, obj):
+        return f"ORD-{obj.id}"
+
+    def get_method(self, obj):
+        return "card"
