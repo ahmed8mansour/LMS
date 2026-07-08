@@ -14,9 +14,10 @@ The Student Progress Tracking system monitors student learning activities, inclu
 | Frontend - Student Dashboard Overview | IMPLEMENTED |
 | Frontend - My Courses Page | IMPLEMENTED |
 | Frontend - Course Progress & Lecture Learning Flow | PARTIALLY IMPLEMENTED |
-| Frontend - Quiz Flow | MISSING / MOCK UI ONLY |
+| Frontend - Quiz Flow | IMPLEMENTED |
+| Frontend - Billing (Payment History) | IMPLEMENTED |
 
-The backend provides the progress endpoints, and the frontend now implements the dashboard overview, enrolled course list, enrolled course curriculum, lecture playback, sidebar navigation, and lecture completion flow. Quiz pages still use mock data and are not connected to the backend quiz APIs.
+The backend provides the progress endpoints, and the frontend now implements the full student learning flow: dashboard overview, enrolled course list, course curriculum, lecture playback, lecture completion, and the quiz flow (fetch questions, submit answers, display results, review mode). The remaining open items are video auto-complete on playback end and wiring the dashboard course-card CTAs to the learning route.
 
 ---
 
@@ -50,6 +51,16 @@ The backend provides the progress endpoints, and the frontend now implements the
 | `/progress/student/learn/lecture/markcomplete/` | POST | Yes | Mark lecture complete |
 | `/progress/student/learn/quiz/makeattempt/` | POST | Yes | Submit quiz answers |
 | `/progress/student/learn/quiz/{id}/` | GET | Yes | Get quiz questions |
+
+### Billing Endpoints
+
+Owned by the `enrollment` app (it already owns `Order`/`Transaction`), surfaced as a subfeature of
+the student dashboard alongside Overview, My Courses, and Learn.
+
+| Endpoint | Method | Auth | Description |
+|----------|--------|------|-------------|
+| `/enrollment/student/billing/summary/` | GET | Yes | Payment summary (total spent, courses purchased, last payment date) |
+| `/enrollment/student/orders/` | GET | Yes | Paginated purchase history (paid/refunded orders) |
 
 ---
 
@@ -298,6 +309,75 @@ The backend provides the progress endpoints, and the frontend now implements the
 
 ---
 
+## Billing / Payment History
+
+Read-only view over the student's own `Order` history (owned by the `enrollment` feature).
+Implemented as a subfeature of Student Progress because it is another surface of the same student
+dashboard (`/dashboard/settings/billing`), reusing the same auth, React Query, and loading/empty/
+error conventions as Overview/My Courses/Learn.
+
+### StudentBillingSummaryView
+
+**Endpoint:** `GET /enrollment/student/billing/summary/`
+
+**Response (200)** — raw payload, no `{data, status}` wrapper (matches the rest of the codebase,
+which does not currently follow the CLAUDE.md response-wrapper convention; reconciling that is
+tracked separately, not part of this subfeature):
+```json
+{
+  "total_spent": "1248.50",
+  "courses_purchased": 14,
+  "last_payment_date": "2026-06-01T10:23:00Z"
+}
+```
+
+**Calculations:**
+- `total_spent`: Sum of `amount` across the user's `paid` orders (`0` if none)
+- `courses_purchased`: Count of the user's `paid` orders
+- `last_payment_date`: `created_at` of the most recent `paid` order, or `null` if none
+
+### StudentOrderHistoryView
+
+**Endpoint:** `GET /enrollment/student/orders/?page={n}`
+
+**Response (200)** — standard DRF page-number pagination shape:
+```json
+{
+  "count": 14,
+  "next": "http://.../enrollment/student/orders/?page=2",
+  "previous": null,
+  "results": [
+    {
+      "id": "ORD-17",
+      "course_name": "Advanced UI Design Principles",
+      "amount": "199.00",
+      "currency": "USD",
+      "status": "paid",
+      "method": "card",
+      "date": "2026-06-01T10:23:00Z"
+    }
+  ]
+}
+```
+
+**Query:** the user's own orders with `status in (paid, refunded)`, newest first. `pending`/`failed`
+orders are excluded (they are not completed purchases). Page size: 6.
+
+**Notes:**
+- `method` is always `"card"` — Stripe card brand/last4 is not captured by the webhook yet, so no
+  masked card number is shown (deferred, see Known Limitations).
+- Receipt download is not implemented — no `stripe_receipt_id` is exposed to the student endpoint;
+  the UI renders a disabled download button ("Receipts coming soon").
+- No enrollment gate needed: orders are inherently scoped to `user=request.user`.
+
+### Edge Cases
+
+1. **No paid orders:** summary returns zeros / `last_payment_date: null`; orders list returns
+   `count: 0, results: []` → frontend shows an empty state ("No purchases yet").
+2. **Not authenticated:** 401, handled by the existing axios refresh-token interceptor.
+
+---
+
 ## Data Models
 
 ### LectureProgress
@@ -504,10 +584,13 @@ def calculate_time_spent(user_profile):
 
 ### Frontend
 
-1. **Quiz UI Not Integrated:** Quiz and quiz result pages currently use mock data.
-2. **No Quiz API Hooks:** `getQuiz` and `submitQuiz` frontend API functions/hooks are not implemented.
-3. **Course Cards Navigation Gap:** Dashboard course cards render a continue/review button, but the shared card itself is not linked to `/dashboard/learn/{id}`.
+1. ~~**Quiz UI Not Integrated**~~ — **RESOLVED.** `QuizContent` and `QuizResult` components are fully wired to the backend quiz APIs. Includes loading/locked/error states, dynamic question rendering, answer submission, review mode, and result display.
+2. ~~**No Quiz API Hooks**~~ — **RESOLVED.** `progressAPI.getQuiz`, `progressAPI.submitQuiz`, `useQuizData`, and `useSubmitQuiz` are implemented.
+3. ~~**Course Cards Navigation Gap**~~ — **RESOLVED.** `DashboardCourseCard` is now wrapped in `<Link>` to `/dashboard/learn/{id}`. The "Resume Learning" banner button and "View All" button are also linked.
 4. **Video Progress Missing:** Video playback exists, but watch position/progress tracking and auto-complete on video end are not implemented.
+5. **Quiz Result Not Refresh-Safe:** The result page reads from React Query's in-memory cache (`setQueryData`). On browser refresh the cache is cleared and the user is redirected back to the quiz page. This is intentional graceful degradation; a persistent solution would require URL search params or session storage.
+6. **Billing Method Column Is Generic:** `Order`/`Transaction` don't capture Stripe card brand/last4, so the billing page always shows a plain "Card" label instead of "•••• 4242".
+7. **No Receipt Download:** The billing table's download button is disabled — no `stripe_receipt_id` is exposed to the student endpoint yet.
 
 ### Missing Features
 

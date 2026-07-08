@@ -174,6 +174,59 @@ Records each individual answer within a quiz attempt.
 
 ---
 
+## Billing Subfeature — Read Interactions with Enrollment
+
+The billing view does not own any models — it is a read-only surface over `Order` and
+`Transaction`, which are owned and written by the `enrollment` app (`StripeWebhookView`). This
+section documents the fields billing depends on and the one schema addition made for it.
+
+### Fields Consumed (owned by `enrollment.models`)
+
+**Order**
+| Field | Type | Used For |
+|-------|------|----------|
+| `id` | AutoField | Displayed as `ORD-{id}` |
+| `course` | FK → Course | `course_name` in transaction row |
+| `user` | FK → CustomUser | Scoping: `Order.objects.filter(user=request.user)` |
+| `status` | CharField | Filter to `paid`/`refunded`; `paid` drives summary totals |
+| `amount` | DecimalField | Row amount + summed into `total_spent` |
+| `currency` | CharField | Row currency |
+| `created_at` | DateTimeField | **New field**, see below — row date, sort key, `last_payment_date` |
+
+**Transaction** — not currently queried by billing (history is built from `Order`, per the
+"one row per purchase" decision), but received the same `created_at` addition for consistency and
+potential future use (e.g. showing individual payment attempts including failures).
+
+### Schema Addition: `created_at`
+
+Neither `Order` nor `Transaction` had a timestamp before this subfeature — added via a **new**
+migration (never modifying existing ones, per project convention):
+
+```python
+# apps/enrollment/models.py
+class Order(models.Model):
+    ...
+    created_at = models.DateTimeField(auto_now_add=True, null=True)
+
+class Transaction(models.Model):
+    ...
+    created_at = models.DateTimeField(auto_now_add=True, null=True)
+```
+
+`null=True` so pre-existing rows (created before this migration) backfill as `NULL` instead of
+requiring a backfill migration; the frontend renders "—" when `date`/`last_payment_date` is null.
+Migration: `apps/enrollment/migrations/0011_order_created_at_transaction_created_at_and_more.py`.
+
+### Deliberately Not Added
+- **Card brand / last4**: the Stripe webhook doesn't capture `payment_method` details, so the
+  billing method column shows a generic "Card" label. Adding this would require reading
+  `charges.data[0].payment_method_details.card` in `handle_payment_succeeded` and storing it on
+  `Transaction` — deferred.
+- **`stripe_receipt_id` exposure**: the field exists on `Transaction` but isn't surfaced to the
+  student endpoint, so receipt download is disabled in the UI — deferred.
+
+---
+
 ## Data Flow Examples
 
 ### Lecture Completion Flow

@@ -10,11 +10,13 @@ from apps.authentication.utils import CookieJWTAuthentication
 
 
 from rest_framework.generics import ListAPIView
-from .serializers import OrderSerializer , CreatePaymentSerializer, GetOrderDetailsSerializer, OrderDetailsResponseSerializer, OrderSummarySerializer
+from .serializers import OrderSerializer , CreatePaymentSerializer, GetOrderDetailsSerializer, OrderDetailsResponseSerializer, OrderSummarySerializer, BillingSummarySerializer, StudentOrderHistorySerializer
 
 from django.db import transaction
+from django.db.models import Sum
 from apps.course.models import Course
 from .models import Order , Transaction , Enrollment
+from .pagination import BillingPageNumberPagination
 import stripe
 
 from apps.course.serializers import CourseSerializer
@@ -234,3 +236,36 @@ class StripeWebhookView(APIView):
 
         except Order.DoesNotExist:
             pass
+
+
+class StudentBillingSummaryView(APIView):
+    authentication_classes = [CookieJWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        paid_orders = Order.objects.filter(user=request.user, status='paid')
+
+        total_spent = paid_orders.aggregate(total=Sum('amount'))['total'] or 0
+        courses_purchased = paid_orders.count()
+        last_payment_date = paid_orders.order_by('-created_at').values_list('created_at', flat=True).first()
+
+        serializer = BillingSummarySerializer({
+            'total_spent': total_spent,
+            'courses_purchased': courses_purchased,
+            'last_payment_date': last_payment_date,
+        })
+
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class StudentOrderHistoryView(ListAPIView):
+    authentication_classes = [CookieJWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    serializer_class = StudentOrderHistorySerializer
+    pagination_class = BillingPageNumberPagination
+
+    def get_queryset(self):
+        return Order.objects.filter(
+            user=self.request.user,
+            status__in=['paid', 'refunded']
+        ).select_related('course').order_by('-created_at')
