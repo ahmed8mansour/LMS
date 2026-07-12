@@ -64,10 +64,16 @@ class CourseSerializer(serializers.ModelSerializer):
         ]
 
     def get_instructor_profile(self , obj):
-        try : 
+        try :
             instructor = obj.instructor.user
-            
-            return UserDataSerializer(instructor).data
+            profile_data = UserDataSerializer(instructor).data
+
+            from apps.reviews.utils import get_instructor_rating
+            rating_data = get_instructor_rating(obj.instructor)
+            profile_data['avg_rating'] = rating_data['avg_rating']
+            profile_data['reviews_count'] = rating_data['reviews_count']
+
+            return profile_data
         except CustomUser.DoesNotExist:
             return None
     def get_sections(self, obj):

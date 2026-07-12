@@ -1,4 +1,4 @@
-# CLAUDE.md
+﻿# CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
@@ -28,7 +28,10 @@ This is a **Learning Management System (LMS)** with a Django REST API backend an
 
 ## API & Response Standards
 
-- All responses must follow this structure:
-  { "data": {}, "status": 200 }
-- All errors must return a meaningful message in "error"
-- Never return raw exceptions or stack traces to the client
+- Success responses return the payload directly — a plain object, a list, or a
+  standard DRF page-number pagination object (`count`/`next`/`previous`/`results`).
+  There is no `{ "data": {}, "status": 200 }` envelope. Match the shape of the
+  surrounding endpoints.
+- Errors return a meaningful message as `{ "error": "message" }`, or DRF
+  serializer field errors as `{ "field": ["message"] }`.
+- Never return raw exceptions or stack traces to the client.

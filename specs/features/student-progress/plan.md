@@ -168,10 +168,9 @@ Return Updated Status
 ```
 Student
   │-- Opens quiz page
-  │-- Current frontend displays mock quiz content only
+  │-- QuizContent fetches questions from GET /learn/quiz/{id}/ and submits answers
   ▼
 Backend
-  │-- API exists for real submission, but frontend is not integrated yet
   │-- Verify quiz is unlocked
   │-- Validate all questions answered
   │-- Grade each answer:
@@ -418,12 +417,15 @@ featuers/progress/
     └── progress.types.ts          # dashboard, course, section, lecture interfaces
 ```
 
-#### Quiz Flow (Not Integrated)
+#### Quiz Flow (IMPLEMENTED)
 ```
-app/dashboard/learn/[id]/quiz/[quizId]/page.tsx          # mock quiz UI only
-app/dashboard/learn/[id]/quiz/[quizId]/result/page.tsx   # mock quiz result UI only
-featuers/progress/api/progress.api.ts                    # missing getQuiz(), submitQuiz()
-featuers/progress/hooks/                                 # missing quiz query/mutation hooks
+app/dashboard/learn/[id]/quiz/[quizId]/page.tsx          # renders QuizContent
+app/dashboard/learn/[id]/quiz/[quizId]/result/page.tsx   # renders QuizResult
+featuers/progress/components/student/QuizContent.tsx     # question UI, submit, review mode
+featuers/progress/components/student/QuizResult.tsx      # score, pass/fail, retry/review
+featuers/progress/api/progress.api.ts                    # getQuiz(), submitQuiz()
+featuers/progress/hooks/useQuizData.tsx                  # quiz query hook
+featuers/progress/hooks/useSubmitQuiz.tsx                # quiz submit mutation hook
 ```
 
 #### Billing Subfeature (IMPLEMENTED)

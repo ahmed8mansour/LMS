@@ -34,6 +34,8 @@ export interface InstructorProfile {
     is_active: boolean
     is_email_verified: boolean
     date_joined: string
+    avg_rating: number | null
+    reviews_count: number
 }
 
 export interface SpecificData {
