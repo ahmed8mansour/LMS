@@ -302,8 +302,8 @@ Backend implementation:
 6. Next section becomes unlocked
 
 Frontend status:
-- Quiz page and quiz result page currently use mock data.
-- Frontend does not yet call GET /progress/student/learn/quiz/{quiz_id}/ or POST /progress/student/learn/quiz/makeattempt/.
+- Quiz page (QuizContent) and quiz result page (QuizResult) are fully integrated with the backend.
+- Frontend calls GET /progress/student/learn/quiz/{quiz_id}/ (useQuizData) and POST /progress/student/learn/quiz/makeattempt/ (useSubmitQuiz).
 ```
 
 ---
@@ -486,7 +486,7 @@ interface LectureCompletionResponse {
     already_completed: boolean;
 }
 
-// Quiz Submission (backend implemented, frontend not integrated yet)
+// Quiz Submission (backend + frontend implemented)
 interface QuizSubmission {
     quiz_id: number;
     answers: {

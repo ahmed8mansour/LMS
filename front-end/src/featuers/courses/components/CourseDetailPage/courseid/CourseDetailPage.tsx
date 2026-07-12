@@ -4,8 +4,7 @@ import CourseEnrollCard from "../../../../enrollment/components/CourseEnrollCard
 import CourseHero from "./CourseHero";
 import CourseGoals from "./CourseGoals";
 import CourseInstructor from "./CourseInstructor";
-import CourseFeedback from "./CourseFeedback";
-
+import ReviewCarouselSection from "@/featuers/reviews/components/course/ReviewCarouselSection";
 import { useCourse } from "@/featuers/courses/hooks/useCourse";
 import { notFound } from "next/navigation";
 import BounceLoader from "@/components/atoms/bouncing-loader";
@@ -89,13 +88,12 @@ export function CourseDetailPage({id}:{id:string}){
                         <CourseGoals goals={course.goals_list}/>
                         <CourseSections Sections={course.sections || []} totalDuration={totalDuration} totalLectures={totalLectures} />
                         <CourseInstructor profile={course.instructor_profile}/>
-                        <CourseFeedback rating={course.rating}/>
-                        
+                        <ReviewCarouselSection course_id={course.id as number} />
                     </div>
 
                     <div className="w-full lg:basis-5/13 xl:basis-3/13 h-fit sticky top-8 rounded-2xl bg-white border border-gray-400/40 shadow-lg p-6">
                         {course?.enrolled_status ? 
-                            <Link href={`/dashboard/${course.id}`} className="text-darkmint flex items-center gap-1.5 ">
+                            <Link href={`/dashboard/learn/${course.id}`} className="text-darkmint flex items-center gap-1.5 ">
                                 See in Dashboard <FaArrowRight/>
                             </Link>
                         :

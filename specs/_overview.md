@@ -170,13 +170,17 @@ Course
 
 ### 5. Reviews System
 
-**Status**: Partial
-**Current**: Courses have `reviews_count` and `rating` fields
-**Missing**:
+**Status**: Complete
+**Implemented**:
 
-- Review submission API
-- Review display on course detail
-- Average rating calculation
+- Review model with one-per-student-per-course constraint
+- Eligibility checks (enrolled + 100% course completion)
+- Submit/edit/delete own reviews (student dashboard)
+- Public course reviews carousel on course detail page (paginated, newest first)
+- Course aggregate rating/count (denormalized, recomputed on every write)
+- Instructor aggregate rating/count (computed on read, published courses only)
+- Admin review removal endpoint
+- "Not yet rated" state for courses/instructors with no reviews
 
 ### 6. Instructor Dashboard
 
