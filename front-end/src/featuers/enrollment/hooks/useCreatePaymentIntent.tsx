@@ -1,10 +1,13 @@
+import type { AxiosError } from 'axios';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useRouter } from 'next/navigation';
 import { enrollmentAPI } from '../api/enrollment.api';
-import { toastsuccess, handleAuthError } from '@/lib/toast';
+import { toastinfo, handleAuthError } from '@/lib/toast';
 import { CreatePaymentIntentResponse, OrderDetails } from '../types/enrollment.types';
 
 export function useCreatePaymentIntent() {
     const queryClient = useQueryClient();
+    const router = useRouter();
 
     return useMutation({
         mutationFn: enrollmentAPI.createPaymentIntent,
@@ -12,7 +15,7 @@ export function useCreatePaymentIntent() {
             // Get course data from cache
             const course_data = queryClient.getQueryData(['course', variables]) as any;
 
-            // Update TanStack Query cache for getOrderDetails
+            // Prime the getOrderDetails cache so the checkout page renders instantly.
             // Use string key to match useParams() return type
             queryClient.setQueryData(['order', data.order.id], {
                 order_id: data.order.id,
@@ -23,9 +26,17 @@ export function useCreatePaymentIntent() {
                 course: course_data,
             } as OrderDetails);
 
-            toastsuccess('Order created successfully');
+            router.replace(`/courses/checkout/${data.order.id}/`);
         },
-        onError(error: any, variables, context) {
+        onError(error: AxiosError) {
+            // 409: a pending checkout already exists for this course. Resume it
+            // instead of erroring — the checkout page self-fetches a fresh
+            // client_secret via GetOrderDetails, so we only need the order id.
+            if (error?.response?.status === 409 && error.response.data?.order_id) {
+                toastinfo('Resuming checkout', 'You already have a checkout in progress');
+                router.replace(`/courses/checkout/${error.response.data.order_id}/`);
+                return;
+            }
             handleAuthError(error, 'Creating Order Failed');
         },
     });

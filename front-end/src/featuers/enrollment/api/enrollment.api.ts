@@ -1,5 +1,5 @@
 import axiosInstance from '@/lib/axios';
-import { CreatePaymentIntentResponse, OrderDetails, BillingSummary, OrdersPage } from '../types/enrollment.types';
+import { CreatePaymentIntentResponse, OrderDetails, BillingSummary, OrdersPage, FreeEnrollmentResponse } from '../types/enrollment.types';
 
 
 async function createPaymentIntent(courseId: string): Promise<CreatePaymentIntentResponse> {
@@ -23,9 +23,15 @@ async function getBillingOrders(page: number): Promise<OrdersPage> {
 }
 
 
+async function enrollFree(courseId: string): Promise<FreeEnrollmentResponse> {
+    const { data } = await axiosInstance.post('enrollment/enroll-free/', { course_id: courseId });
+    return data;
+}
+
 export const enrollmentAPI = {
     createPaymentIntent,
     getOrderDetail,
     getBillingSummary,
     getBillingOrders,
+    enrollFree,
 };

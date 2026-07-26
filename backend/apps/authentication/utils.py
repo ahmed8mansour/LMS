@@ -1,10 +1,9 @@
-from django.core.mail import send_mail
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.exceptions import InvalidToken, AuthenticationFailed
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import requests
 from rest_framework import serializers
 
@@ -132,7 +131,7 @@ def set_jwt_cookies(response, user):
     response.set_cookie(
         key='access_token',
         value=access_token,
-        expires=datetime.utcnow() + access_token_lifetime,
+        expires=datetime.now(timezone.utc) + access_token_lifetime,
         **cookie_settings
     )
     
@@ -140,7 +139,7 @@ def set_jwt_cookies(response, user):
     response.set_cookie(
         key='refresh_token',
         value=refresh_token,
-        expires=datetime.utcnow() + refresh_token_lifetime,
+        expires=datetime.now(timezone.utc) + refresh_token_lifetime,
         **cookie_settings
 
     )
@@ -214,38 +213,3 @@ def clear_password_reset_token_cookie(response):
     )
     return response
 
-
-def send_otp_email(user, otp_code, purpose='registration'):
-
-    subject_map = {
-        'registration': 'Verify Your Email - OTP Code',
-        'password_reset': 'Reset Your Password - OTP Code',
-        'forget_password': 'Reset Your Password - OTP Code',
-        'google_set_password': 'Set Your Password - OTP Code',
-        'login': 'Two-Factor Authentication - OTP Code',
-    }
-    
-    subject = subject_map.get(purpose, 'Your OTP Code')
-    
-    
-    plain_message = f"""
-    Hello {user.first_name or user.username}!
-    
-    Your OTP code is: {otp_code}
-    
-    This code will expire in 10 minutes     .
-    If you didn't request this code, please ignore this email.
-    """
-
-    try:
-        send_mail(
-            subject=subject,
-            message=plain_message,
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[user.email],
-            fail_silently=False,
-        )
-        return True
-    except Exception as e:
-        print(f"Error sending email: {e}")
-        return False

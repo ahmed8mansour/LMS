@@ -21,9 +21,7 @@ export function DashboardLogout({isCollapsed}: { isCollapsed: boolean }) {
         });
     }
     const queryClient = useQueryClient();
-    const user = queryClient.getQueryData(['user', 'profile']) 
-
-    console.log(user)
+    const user = queryClient.getQueryData(['user', 'profile'])
     return (
         <div className="p-3 pt-0">
                 <button

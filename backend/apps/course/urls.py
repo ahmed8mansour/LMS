@@ -2,6 +2,7 @@ from django.urls import path, include
 from .views import  AdminCourseViewSet , AdminLectureViewSet , AdminSectionViewSet , AdminQuizViewSet
 from .views import InstructorCourseViewSet , InstructorLectureViewSet , InstructorSectionViewSet , InstructorQuizViewSet
 from .views import StudentCourseViewSet , StudentSectionViewSet , StudentLectureViewSet , StudentQuizViewSet , StudentCourseView
+from .views import VideoUploadSignatureView, VideoWebhookView
 from rest_framework.routers import DefaultRouter
 
 router = DefaultRouter()
@@ -29,7 +30,9 @@ router.register('student/quizzes' , StudentQuizViewSet , basename='student_quizz
 
 urlpatterns = [
     path('' , include(router.urls)),
-    path('student/homepage/' , StudentCourseView.as_view() , name="homepage")
+    path('student/homepage/' , StudentCourseView.as_view() , name="homepage"),
+    path('video/upload-signature/', VideoUploadSignatureView.as_view(), name='video_upload_signature'),
+    path('video/webhook/', VideoWebhookView.as_view(), name='video_webhook'),
 ]
 
 

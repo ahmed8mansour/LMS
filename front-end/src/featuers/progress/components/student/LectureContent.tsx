@@ -5,6 +5,7 @@ import { Check, ChevronLeft, ChevronRight, RotateCcw } from "lucide-react";
 import { Button } from "@/components/atoms/button";
 import { Skeleton } from "@/components/atoms/skeleton";
 import { useEnrolledLectureDetail } from "../../hooks/useEnrolledLectureDetail";
+import { HlsVideoPlayer } from "@/components/molecules/HlsVideoPlayer";
 import Link from "next/link";
 import { useStudentDashboardCourses } from "../../hooks/useStudentDashboardCourses";
 import { useEnrolledStudentCourseOverview } from "../../hooks/useEnrolledStudentCourseOverView";
@@ -22,7 +23,6 @@ export function LectureContent({ lectureId , id }: LectureContentProps) {
 
   const { data: course_data } = useEnrolledStudentCourseOverview(parseInt(id));  
   const { previous , next} = getNextPreviousLecture(course_data, parseInt(lectureId))
-  console.log({ previous, next })
 
 
 
@@ -66,11 +66,11 @@ export function LectureContent({ lectureId , id }: LectureContentProps) {
   return (
     <div className="max-w-5xl mx-auto p-4 md:p-8 lg:p-10 space-y-8 pb-24">
       <div className="w-full aspect-video bg-darkbg rounded-xl overflow-hidden relative shadow-md group">
-        <video
-          className="h-full w-full bg-darktext object-contain"
+        <HlsVideoPlayer
           src={lecture.video_url}
-          controls
-          preload="metadata"
+          status={lecture.video_status}
+          title={lecture.title}
+          className="h-full w-full bg-darktext object-contain"
         />
       </div>
 

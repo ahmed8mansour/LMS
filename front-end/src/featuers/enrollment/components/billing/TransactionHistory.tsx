@@ -7,6 +7,13 @@ import { Button } from "@/components/atoms/button";
 import BounceLoader from "@/components/atoms/bouncing-loader";
 import { useStudentOrders } from "../../hooks/useStudentOrders";
 
+function formatPaymentMethod(method: string): string {
+    return method
+        .split("_")
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(" ");
+}
+
 export function TransactionHistory() {
     const [page, setPage] = useState(1);
     const { data, isLoading, isError, isPlaceholderData } = useStudentOrders(page);
@@ -82,7 +89,7 @@ export function TransactionHistory() {
                                     <td className="px-4 md:px-6 py-4">
                                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                             <CreditCard className="text-lg" />
-                                            Card
+                                            {formatPaymentMethod(order.method)}
                                         </div>
                                     </td>
                                     <td className="px-4 md:px-6 py-4">
@@ -96,9 +103,17 @@ export function TransactionHistory() {
                                         {new Date(order.date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
                                     </td>
                                     <td className="px-4 md:px-6 py-4 text-right">
-                                        <Button variant="ghost" size="sm" disabled title="Receipts coming soon">
-                                            <Download />
-                                        </Button>
+                                        {order.receipt_url ? (
+                                            <Button variant="ghost" size="sm" asChild title="View receipt">
+                                                <a href={order.receipt_url} target="_blank" rel="noopener noreferrer">
+                                                    <Download />
+                                                </a>
+                                            </Button>
+                                        ) : (
+                                            <Button variant="ghost" size="sm" disabled title="No receipt available">
+                                                <Download />
+                                            </Button>
+                                        )}
                                     </td>
                                 </tr>
                             ))}

@@ -22,7 +22,6 @@ export function LoginForm() {
 
     
     const onSubmit: SubmitHandler<LoginFormData> = (data) => {
-        console.log(data)
         userLogin(data , {
             onSuccess(data) {
                 router.replace("/")

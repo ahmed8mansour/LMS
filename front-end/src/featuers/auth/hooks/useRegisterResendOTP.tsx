@@ -1,3 +1,4 @@
+import type { AxiosError } from 'axios';
 import { useMutation } from '@tanstack/react-query';
 import { authAPI } from '../api/auth.api';
 import { ResendOTPResponse } from '../types/auth.types';
@@ -10,7 +11,7 @@ export function useRegisterResendOTP() {
         onSuccess(data: ResendOTPResponse, variables, onMutateResult, context) {
             toastsuccess('Resending OTP Is Successful', data.message)
         },
-        onError(error: any, variables, onMutateResult, context) {
+        onError(error: AxiosError, variables, onMutateResult, context) {
             handleAuthError(error, 'Resending OTP Failed')
         },
     })

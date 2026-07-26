@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from apps.course.models import Lecture , Section , Quiz , Question , Choice , Course
+from apps.course.video.factory import get_video_provider
 
 from apps.authentication.models import CustomUser
 from apps.authentication.serializers import UserDataSerializer
@@ -44,11 +45,12 @@ class StudentDashboardOverviewSerializer(serializers.Serializer):
 class LectureProgressSerializer(serializers.ModelSerializer):
     is_completed = serializers.SerializerMethodField()
     is_unlocked = serializers.SerializerMethodField()
+    video_url = serializers.SerializerMethodField()
 
-    class Meta : 
+    class Meta :
         model = Lecture
-        fields = ['id' , 'title' , 'duration' , 'order' , 'video_url' , 'is_completed' , 'is_unlocked' ]
-    
+        fields = ['id' , 'title' , 'duration' , 'order' , 'video_url' , 'video_status' , 'is_completed' , 'is_unlocked' ]
+
     def get_is_completed(self, obj):
         completed_ids = self.context.get('completed_lecture_ids', set())
         return obj.id in completed_ids
@@ -56,6 +58,13 @@ class LectureProgressSerializer(serializers.ModelSerializer):
     def get_is_unlocked(self, obj):
         unlocked_ids = self.context.get('unlocked_lecture_ids', set())
         return obj.id in unlocked_ids
+
+    def get_video_url(self, obj):
+        # Enrollment + unlock access is already enforced by the view before this
+        # serializer runs; here we only decide whether the asset is playable yet.
+        if not obj.video_public_id or obj.video_status != 'COMPLETED':
+            return None
+        return get_video_provider().build_streaming_url(obj.video_public_id)
 
 class QuizProgressSerializer(serializers.ModelSerializer):
     is_passed   = serializers.SerializerMethodField()
@@ -174,7 +183,12 @@ class AnswerSerializer(serializers.Serializer):
     choice_id   = serializers.IntegerField()
 
 
+class MarkLectureCompleteSerializer(serializers.Serializer):
+    lecture_id = serializers.IntegerField()
+
+
 class QuizSubmitSerializer(serializers.Serializer):
+    quiz_id = serializers.IntegerField()
     answers = AnswerSerializer(many=True)
 
 

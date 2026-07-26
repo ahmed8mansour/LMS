@@ -1,5 +1,7 @@
+import type { AxiosError } from 'axios';
 import { useMutation  , useQueryClient} from '@tanstack/react-query';
 import { authAPI } from '../api/auth.api';
+import { UserProfile } from '../types/auth.types';
 import { toastsuccess, handleAuthError } from '@/lib/toast';
 
 export function useUpdateProfile() {
@@ -9,11 +11,11 @@ export function useUpdateProfile() {
 
     return useMutation({
         mutationFn: authAPI.updateUserProfile,
-        onSuccess(data: any, variables, context) {
+        onSuccess(data: UserProfile, variables, context) {
             queryClient.setQueryData(['user', 'profile'], data)
-            toastsuccess('Profile updated!', data.message || 'Profile updated successfully!')
+            toastsuccess('Profile updated!', 'Profile updated successfully!')
         },
-        onError(error: any) {
+        onError(error: AxiosError) {
             handleAuthError(error, 'Update Failed')
         },
     });

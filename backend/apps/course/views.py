@@ -2,6 +2,8 @@ from django.shortcuts import render
 from django.http import HttpResponse
 from rest_framework.response import Response
 from datetime import datetime, timedelta
+from dataclasses import asdict
+import logging
 from rest_framework import serializers
 
 from rest_framework import mixins, permissions , generics
@@ -9,7 +11,6 @@ from rest_framework.views import APIView
 
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from rest_framework import status
 
@@ -20,18 +21,22 @@ from .models import Course , Section , Quiz , Lecture
 from rest_framework.viewsets import ModelViewSet , ReadOnlyModelViewSet
 
 from .permissions import isAdmin , isInstructor
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 
 from apps.authentication.utils import CookieJWTAuthentication
 from apps.authentication.models import InstructorProfile
 
 from rest_framework.serializers import ValidationError
+from rest_framework.exceptions import NotFound, PermissionDenied
 from rest_framework import filters
 from .pagination import CourseCursorPagination
 
 from rest_framework.generics import ListAPIView
 from apps.enrollment.models import Enrollment
+from .video.service import VideoUploadService, VideoWebhookService
 # Create your views here.
+
+logger = logging.getLogger(__name__)
 
 
 class AdminCourseViewSet(ModelViewSet):
@@ -100,7 +105,7 @@ class InstructorSectionViewSet(ModelViewSet):
         course = serializer.validated_data.get('course')
         #  نتأكد إن الكورس تبعه هو
         if course.instructor != self.request.user.instructor_profile:
-            raise ValidationError({"detail":"You don't have access on this Section"})
+            raise ValidationError({"error": "You don't have access to this section"})
         serializer.save()
 
 
@@ -121,7 +126,7 @@ class InstructorLectureViewSet(ModelViewSet):
         section = serializer.validated_data.get('section')
         #  نتأكد إن السيكشن تبع كورس له
         if section.course.instructor != self.request.user.instructor_profile:
-            raise ValidationError({"detail":"You don't have access on this Section"})
+            raise ValidationError({"error": "You don't have access to this section"})
         serializer.save()
 
 
@@ -141,7 +146,7 @@ class InstructorQuizViewSet(ModelViewSet):
     def perform_create(self, serializer):
         section = serializer.validated_data.get('section')
         if section.course.instructor != self.request.user.instructor_profile:
-            raise ValidationError({"detail":"You don't have access on this Section"})
+            raise ValidationError({"error": "You don't have access to this section"})
         serializer.save()
 
 
@@ -257,3 +262,63 @@ class StudentCourseView(ListAPIView):
                 item['enrolled_status'] = item['id'] in enrolled_ids
 
         return response
+
+
+class VideoUploadSignatureView(APIView):
+    """
+    POST /courses/video/upload-signature/
+
+    Returns signed Cloudinary upload params so the browser can upload
+    directly to Cloudinary (chunked), never through this server.
+
+    body: { "lecture_id": <int> }  -> binds the upload to that lecture: the
+           generated public_id is saved on the lecture up front, so the
+           completion webhook always finds the row (no upload/webhook race).
+    body: {}                       -> generic upload, not bound to a lecture.
+    """
+    authentication_classes = [CookieJWTAuthentication]
+    permission_classes = [IsAuthenticated, (isInstructor | isAdmin)]
+
+    def post(self, request):
+        lecture = None
+        lecture_id = request.data.get('lecture_id')
+        if lecture_id is not None:
+            lecture = self._get_owned_lecture(request, lecture_id)
+
+        credentials = VideoUploadService().credentials_for(lecture)
+        return Response(asdict(credentials), status=status.HTTP_200_OK)
+
+    def _get_owned_lecture(self, request, lecture_id):
+        lecture = (
+            Lecture.objects
+            .select_related('section__course__instructor')
+            .filter(id=lecture_id)
+            .first()
+        )
+        if not lecture:
+            raise NotFound("Lecture not found")
+        if not request.user.is_superuser and lecture.section.course.instructor.user_id != request.user.id:
+            raise PermissionDenied("You don't have access to this lecture")
+        return lecture
+
+
+class VideoWebhookView(APIView):
+    """
+    POST /courses/video/webhook/
+
+    Called by Cloudinary (not the frontend) when eager HLS transcoding
+    finishes. Verified via Cloudinary's signature headers, not JWT auth.
+    """
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        signature = request.headers.get('X-Cld-Signature', '')
+        timestamp = request.headers.get('X-Cld-Timestamp', '')
+
+        success = VideoWebhookService().handle(request.body, signature, timestamp)
+        if not success:
+            logger.error("Rejected video webhook: invalid signature")
+            return Response({'error': 'Invalid webhook signature'}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response({'message': 'ok'}, status=status.HTTP_200_OK)

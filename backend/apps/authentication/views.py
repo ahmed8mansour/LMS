@@ -3,7 +3,7 @@ import hashlib
 from django.shortcuts import render
 from django.http import HttpResponse
 from rest_framework.response import Response
-from datetime import datetime, time, timedelta
+from datetime import datetime, time, timedelta, timezone
 
 
 from rest_framework import mixins, permissions , generics
@@ -12,7 +12,6 @@ from rest_framework.parsers import MultiPartParser, FormParser
 
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework_simplejwt.authentication import JWTAuthentication
 from .utils import CookieJWTAuthentication
 
 from rest_framework import status
@@ -20,7 +19,7 @@ from rest_framework import status
 from .models import CustomUser
 
 from .serializers import   GoogleLoginSerializer,GoogleRegisterSerializer, UserForgetPasswordSetnewoneSerializer ,UserForgetPasswordVerifyOTPSerializer, CustomUserRegisterSendOTPSerializer , UserDataSerializer  , UserLoginSerializer , UserSetPasswordSerializer , UserChangePasswordSerializer , UserRegisterVerifyOTPSerializer , UserResnedOTPSerializer , UserForgetPasswordSendOTPSerializer, GoogleSetPasswordSendOTPSerializer, GoogleSetPasswordVerifyOTPSerializer, GoogleSetPasswordNewPasswordSerializer
-from .utils import send_otp_email, set_jwt_cookies, clear_jwt_cookies, CookieJWTAuthentication, set_password_reset_token_cookie, clear_password_reset_token_cookie
+from .utils import set_jwt_cookies, clear_jwt_cookies, CookieJWTAuthentication, set_password_reset_token_cookie, clear_password_reset_token_cookie
 # Create your views here.
 import logging
 
@@ -39,6 +38,7 @@ logger = logging.getLogger(__name__)
 
 
 class UserRegisterSendOTPView(APIView):
+    throttle_scope = 'register'
     # body: {
 #     username:
 #     email:
@@ -47,11 +47,11 @@ class UserRegisterSendOTPView(APIView):
 # }
 
     def post(self, request):
-        print(request.data)
+        logger.info("Registration OTP requested for email=%s", request.data.get('email'))
         serializer = CustomUserRegisterSendOTPSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
-            print(serializer.data)
+            logger.info("Registration OTP sent for email=%s", request.data.get('email'))
             return Response(serializer.data , status=status.HTTP_201_CREATED)
         else:
             errors = serializer.errors
@@ -61,9 +61,10 @@ class UserRegisterSendOTPView(APIView):
                 for err in field_errors:
                     messages.append(str(err))
 
-            return Response( {"error": messages}, status=400)
+            return Response({"error": "; ".join(messages)}, status=400)
 
 class UserRegisterVerifyOTPView(APIView):
+    throttle_scope = 'otp'
     # body: {
     #     email:
     #     otp_code:
@@ -77,13 +78,14 @@ class UserRegisterVerifyOTPView(APIView):
             # Set JWT cookies
             user = serializer.validated_data['user']
             response = set_jwt_cookies(response, user)
-            print("JWT cookies set:", response.cookies)
+            logger.info("JWT cookies set for user_id=%s", user.id)
             return response
         else:
             error = serializer.errors 
             return Response(error, status=status.HTTP_400_BAD_REQUEST)
 
 class UserForgetPasswordSendOTPView(APIView):
+    throttle_scope = 'otp'
     # {body : 'email'}
     def post(self , request):
         serializer = UserForgetPasswordSendOTPSerializer(data = request.data)
@@ -97,6 +99,7 @@ class UserForgetPasswordSendOTPView(APIView):
             return Response(error , status=status.HTTP_400_BAD_REQUEST)
 
 class UserForgetPasswordVerifyOTPView(APIView):
+    throttle_scope = 'otp'
     # {body : 'email' , 'otp_code'}
     def post(self , request):
         serializer = UserForgetPasswordVerifyOTPSerializer(data = request.data)
@@ -137,6 +140,7 @@ class UserForgetPasswordSetnewoneView(APIView):
             return Response(error , status=status.HTTP_400_BAD_REQUEST)
 
 class UserResendOTPView(APIView):
+    throttle_scope = 'register'
     # {body : 'email'}
     def post(self , request):
         serializer = UserResnedOTPSerializer(data = request.data )
@@ -216,12 +220,13 @@ class UserProfileUpdateView(APIView):
             return Response(serizalizer.data , status=status.HTTP_200_OK)
         logger.debug(">>> Response sent error")
         logger.debug(f">>> {serizalizer.errors}")
-        return Response(serizalizer.errors , status= status.HTTP_404_NOT_FOUND)
+        return Response(serizalizer.errors , status= status.HTTP_400_BAD_REQUEST)
     
 
 
 class UserLoginView(APIView):
     permission_classes = [permissions.AllowAny]
+    throttle_scope = 'login'
 
     def post(self , request):
         serializer = UserLoginSerializer(data=request.data , context ={'request': request} )
@@ -255,7 +260,7 @@ class UserChangePasswordView(APIView):
 
 class UserSetPasswordView(APIView):
     permission_classes= [permissions.IsAuthenticated]
-    authentication_classes = [JWTAuthentication]
+    authentication_classes = [CookieJWTAuthentication]
     # post :
     # header:{access_token}
     # body:{password}
@@ -289,7 +294,8 @@ class GoogleRegisterAPIView(APIView):
     """
 
     permission_classes = [permissions.AllowAny]
-    
+    throttle_scope = 'login'
+
     def post(self, request):
         serializer = GoogleRegisterSerializer(data=request.data)
         
@@ -329,7 +335,8 @@ class GoogleLoginAPIView(APIView):
     """
 
     permission_classes = [permissions.AllowAny]
-    
+    throttle_scope = 'login'
+
     def post(self, request):
         serializer = GoogleLoginSerializer(data=request.data)
         
@@ -363,7 +370,8 @@ class GoogleSetPasswordSendOTPView(APIView):
     """
     permission_classes = [permissions.IsAuthenticated]
     authentication_classes = [CookieJWTAuthentication]
-    
+    throttle_scope = 'otp'
+
     def post(self, request):
         serializer = GoogleSetPasswordSendOTPSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
@@ -387,6 +395,7 @@ class GoogleSetPasswordVerifyOTPView(APIView):
     """
     permission_classes = [permissions.IsAuthenticated]
     authentication_classes = [CookieJWTAuthentication]
+    throttle_scope = 'otp'
 
     def post(self, request):
         serializer = GoogleSetPasswordVerifyOTPSerializer(data=request.data, context={'request': request})
@@ -472,14 +481,14 @@ class TokenRefreshCookieView(APIView):
             response.set_cookie(
                 key='access_token',
                 value=new_access_token,
-                expires=datetime.utcnow() + access_token_lifetime,
+                expires=datetime.now(timezone.utc) + access_token_lifetime,
                 **cookie_settings
             )
             
             return response
             
         except Exception as e:
-            print(f"TokenError: {str(e)}")
+            logger.error("Token refresh failed: %s", e)
             return Response(
                 {'error': 'Invalid or expired refresh token'},
                 status=status.HTTP_401_UNAUTHORIZED

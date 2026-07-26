@@ -12,8 +12,8 @@ import { LiaCertificateSolid } from "react-icons/lia";
 import { FiDownload } from "react-icons/fi";
 import { useGetOrderDetail } from '../hooks/useGetOrderDetail';
 import { useProceedPayment } from "../hooks/useProceedPayment";
-import { useParams } from 'next/navigation';
-import { useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { notFound } from "next/navigation";
 import BounceLoader from '@/components/atoms/bouncing-loader';
@@ -67,6 +67,9 @@ function PaymentForm() {
                         {/* Stripe PaymentElement */}
                         <PaymentElement
                             onReady={() => setPaymentElementReady(true)}
+                            onLoadError={(error) => {
+                                console.error("Stripe Element failed to load:", error);
+                            }}
                         />
                     </div>
                 </Field>
@@ -100,17 +103,24 @@ function PaymentForm() {
 // Main checkout component
 export function CourseCheckout() {
     const params = useParams();
+    const router = useRouter();
     const order_id = params.orderID as string | undefined;
 
     const { data: orderData, isLoading, isError } = useGetOrderDetail(order_id || null);
     const course_data = orderData?.course;
 
-    if (isLoading) return (
+    useEffect(() => {
+        if (orderData?.already_paid && course_data?.id) {
+            router.replace(`/dashboard/learn/${course_data.id}/`);
+        }
+    }, [orderData?.already_paid, course_data?.id, router]);
+
+    if (isLoading || orderData?.already_paid) return (
         <div className="flex items-center justify-center flex-1">
             <BounceLoader />
         </div>
     );
-    if (isError || !orderData) return notFound();
+    if (isError || !orderData || !orderData.client_secret) return notFound();
 
     const options = {
         clientSecret: orderData.client_secret,

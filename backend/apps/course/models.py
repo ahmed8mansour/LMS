@@ -60,7 +60,13 @@ class Lecture(models.Model):
     section = models.ForeignKey('Section' , on_delete=models.CASCADE , related_name='lectures')
     title=models.CharField( max_length=255 )    
     duration = models.DecimalField(max_digits=6 , decimal_places=2)
-    video_url = models.CharField(max_length=255555)
+    video_public_id = models.CharField(max_length=255, null=True, blank=True)
+    video_status = models.CharField(max_length=20, choices=[
+        ('PENDING', 'Pending'),
+        ('PROCESSING', 'Processing'),
+        ('COMPLETED', 'Completed'),
+        ('FAILED', 'Failed'),
+    ], default='PENDING')
     order = models.IntegerField()
     
     class Meta:

@@ -1,3 +1,4 @@
+import type { AxiosError } from 'axios';
 import { useMutation } from '@tanstack/react-query';
 import { authAPI } from '../api/auth.api';
 import { useAuthStore } from '@/store/auth.store';
@@ -15,7 +16,7 @@ export function useRegisterVerifyOTP() {
             removeCookies('pending_email')
             toastsuccess('Verification Is Successful', data.message)
         },
-        onError(error: any, variables, onMutateResult, context) {
+        onError(error: AxiosError, variables, onMutateResult, context) {
             handleAuthError(error, 'Verification Failed')
         },
     })

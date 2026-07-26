@@ -1,3 +1,4 @@
+import type { AxiosError } from 'axios';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { progressAPI } from '../api/progress.api';
 import { QuizSubmission } from '../types/progress.types';
@@ -20,7 +21,7 @@ export function useSubmitQuiz(quizId: string | number) {
             queryClient.invalidateQueries({ queryKey: ['dashboard'] });
             toastsuccess(data.passed ? 'Quiz passed! Great work.' : 'Quiz submitted.');
         },
-        onError(error: unknown) {
+        onError(error: AxiosError) {
             handleAuthError(error, 'Failed to submit quiz');
         },
     });

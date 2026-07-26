@@ -46,6 +46,15 @@ class GetOrderDetailsSerializer(serializers.Serializer):
         return value
 
 
+class FreeEnrollmentSerializer(serializers.Serializer):
+    course_id = serializers.IntegerField()
+
+
+class RefundOrderSerializer(serializers.Serializer):
+    """Validates the request shape only; existence/eligibility checks happen in the view so a missing order can return 404 instead of a 400 field error."""
+    order_id = serializers.IntegerField()
+
+
 class OrderDetailsResponseSerializer(serializers.Serializer):
     order_id = serializers.IntegerField()
     client_secret = serializers.CharField()
@@ -103,14 +112,26 @@ class StudentOrderHistorySerializer(serializers.ModelSerializer):
     id = serializers.SerializerMethodField()
     course_name = serializers.CharField(source='course.title')
     method = serializers.SerializerMethodField()
+    receipt_url = serializers.SerializerMethodField()
     date = serializers.DateTimeField(source='created_at')
 
     class Meta:
         model = Order
-        fields = ['id', 'course_name', 'amount', 'currency', 'status', 'method', 'date']
+        fields = ['id', 'course_name', 'amount', 'currency', 'status', 'method', 'receipt_url', 'date']
 
     def get_id(self, obj):
         return f"ORD-{obj.id}"
 
+    def _latest_transaction(self, obj):
+        transactions = list(obj.transaction_set.all())
+        if not transactions:
+            return None
+        return max(transactions, key=lambda t: t.created_at)
+
     def get_method(self, obj):
-        return "card"
+        transaction = self._latest_transaction(obj)
+        return transaction.payment_method_type if transaction else "card"
+
+    def get_receipt_url(self, obj):
+        transaction = self._latest_transaction(obj)
+        return transaction.receipt_url if transaction else None
