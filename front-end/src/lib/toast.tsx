@@ -35,8 +35,6 @@ export const toastinfo = (head: string, body: string) => {
 }
 
 export function handleAuthError(error: any, fallbackHead: string = 'Authentication Failed') {
-    // Handle network errors
-    console.log(error)
     if (!error.response) {
         toasterror('Network Error', "Can't connect to server")
         return

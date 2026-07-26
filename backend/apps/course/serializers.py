@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Course , Section ,Lecture , Quiz 
+from .models import Course , Section ,Lecture , Quiz
 from apps.authentication.models import CustomUser
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -10,14 +10,30 @@ from rest_framework import status
 from django.forms.models import model_to_dict
 
 from apps.authentication.serializers import UserDataSerializer
+from .video.factory import get_video_provider
+from .video.access import can_access_lecture_video
 
 class LectureSerializer(serializers.ModelSerializer):
+    video_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Lecture
-        # fields='__all__'
-        exclude = ['video_url']
-    
+        # video_public_id is managed by the video subsystem (assigned at
+        # signature time, updated by the webhook), never written by clients.
+        fields = ['id', 'section', 'title', 'duration', 'order', 'video_status', 'video_url']
+        read_only_fields = ['video_status']
+
+    def get_video_url(self, obj):
+        if not obj.video_public_id or obj.video_status != 'COMPLETED':
+            return None
+
+        request = self.context.get('request')
+        if not request or not can_access_lecture_video(request, obj.section.course):
+            return None
+
+        return get_video_provider().build_streaming_url(obj.video_public_id)
+
+
 
 
 
@@ -42,8 +58,8 @@ class SectionSerializer(serializers.ModelSerializer):
         quiz = Quiz.objects.filter(section=instance).first()
 
         section_data = super().to_representation(instance)
-        section_data['lectures'] = LectureSerializer(lectures, many=True).data
-        section_data['quiz'] = QuizSerializer(quiz).data if quiz else None    
+        section_data['lectures'] = LectureSerializer(lectures, many=True, context=self.context).data
+        section_data['quiz'] = QuizSerializer(quiz).data if quiz else None
 
         return section_data
 

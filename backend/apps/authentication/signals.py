@@ -15,12 +15,3 @@ def create_user_profile(sender, instance, created, **kwargs):
             InstructorProfile.objects.create(user=instance)
         elif instance.role == 'admin':
             AdminProfile.objects.create(user=instance)
-
-
-@receiver(post_save, sender=CustomUser)
-def save_user_profile(sender, instance, **kwargs):
-    """
-    Save the related profile when user is saved.
-    """
-    # This ensures any related profile changes are saved with the user
-    pass

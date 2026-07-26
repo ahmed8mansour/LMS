@@ -14,13 +14,21 @@ export interface CreatePaymentIntentResponse {
 
 export interface OrderDetails {
     order_id: number
-    client_secret: string
+    client_secret?: string
     amount: string
     currency: string
     course: Course
     status: 'pending' | 'paid' | 'failed' | 'refunded'
+    already_paid?: boolean
+    message?: string
 }
 
+
+export interface FreeEnrollmentResponse {
+    message: string
+    enrollment_id: number
+    course_id: number
+}
 
 export interface BillingSummary {
     total_spent: string
@@ -35,6 +43,7 @@ export interface OrderHistoryItem {
     currency: string
     status: 'paid' | 'refunded'
     method: string
+    receipt_url: string | null
     date: string
 }
 

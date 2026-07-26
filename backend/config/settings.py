@@ -19,9 +19,10 @@ environ.Env.read_env(os.path.join(BASE_DIR, ".env"))
 SECRET_KEY = env('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = env('DEBUG')
+DEBUG = env.bool('DEBUG', default=False)
 
-ALLOWED_HOSTS = []
+# ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1'])
+ALLOWED_HOSTS = ['*']
 
 # settings.py
 LOGGING = {
@@ -74,6 +75,8 @@ INSTALLED_APPS = [
     'apps.enrollment',
     'apps.progress',
     'apps.reviews',
+
+    "anymail",
 ]
 
 
@@ -87,6 +90,8 @@ INSTALLED_APPS = [
 STRIPE_PUBLISHABLE_KEY = env('STRIPE_PUBLISHABLE_KEY')
 STRIPE_SECRET_KEY = env('STRIPE_SECRET_KEY')
 STRIPE_WEBHOOK_SECRET = env('STRIPE_WEBHOOK_SECRET')
+
+PAYMENT_GATEWAY = 'stripe'
 
 # ================================
 # ================================
@@ -108,10 +113,7 @@ MIDDLEWARE = [
 ]
 
 # CORS Settings
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-]
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS', default=['http://localhost:3000'])
 CORS_ALLOW_CREDENTIALS = True  # Required for HttpOnly cookies
 
 # ==========================
@@ -134,7 +136,14 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'apps.authentication.utils.CookieJWTAuthentication',
     ),
-
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.ScopedRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'login': '5/min',
+        'otp': '3/min',
+        'register': '3/min',
+    },
 }
 
 
@@ -165,6 +174,11 @@ CLOUDINARY_STORAGE = {
     'API_SECRET': env('CLOUDINARY_API_SECRET')
 } 
 
+# Cloudinary Video Configuration
+VIDEO_PROVIDER = 'cloudinary'
+CLOUDINARY_VIDEO_WEBHOOK_URL = env('CLOUDINARY_VIDEO_WEBHOOK_URL')
+
+
 # هادا في مشكلة 
 # DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 STORAGES = {
@@ -179,8 +193,14 @@ STORAGES = {
 # ==========================
 # Email Backend
 # ==========================
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+EMAIL_BACKEND = 'anymail.backends.sendgrid.EmailBackend'
 
+ANYMAIL = {
+    "SENDGRID_API_KEY": env('SENDGRID_API_KEY'),
+}
+
+# البريد الافتراضي للمرسل
+DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL')
 # ==========================
 # Authentication Backends
 # ==========================
@@ -218,7 +238,7 @@ from datetime import timedelta
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
-    'ROTATE_REFRESH_TOKENS': False,
+    'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
     'AUTH_HEADER_TYPES': ('Bearer',),
     'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),

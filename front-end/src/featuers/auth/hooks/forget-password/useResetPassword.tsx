@@ -1,3 +1,4 @@
+import type { AxiosError } from 'axios';
 import { useMutation } from '@tanstack/react-query';
 import { authAPI } from '../../api/auth.api';
 import { removeCookies } from '@/lib/cookies'
@@ -14,7 +15,7 @@ export function useResetPassword() {
             queryClient.setQueryData( ['user' , 'profile'], data.user_data )
             toastsuccess('Reset Is Successful', data.message)
         },
-        onError(error: any, variables, onMutateResult, context) {
+        onError(error: AxiosError, variables, onMutateResult, context) {
             handleAuthError(error, 'Reset Failed')
         },
     })

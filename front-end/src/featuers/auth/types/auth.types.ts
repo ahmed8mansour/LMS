@@ -21,7 +21,7 @@ export interface UserProfile {
     has_usable_password: boolean
 }
 
-export type SpecificData = any
+export type SpecificData = Record<string, unknown> | null
 
 
 
@@ -78,7 +78,7 @@ export interface ForgetPasswordVerifyOTPResponse {
 
 export interface ForgetPasswordResetResponse {
     message: string;
-    user_data: string;
+    user_data: UserData;
 }
 
 export interface ForgetPasswordResetRequest {
@@ -117,7 +117,6 @@ export interface ResendOTPResponse {
 export interface VerifyOTPResponse {
     message: string
     user_data: UserData
-    tokens: Tokens
 }
 
 export interface UserData {
@@ -130,12 +129,7 @@ export interface UserData {
     is_active: boolean
     is_email_verified: boolean
     date_joined: string
-    profile: any
-}
-
-export interface Tokens {
-    refresh: string
-    access: string
+    profile: SpecificData
 }
 
 

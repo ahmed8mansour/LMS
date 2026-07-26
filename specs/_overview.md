@@ -23,7 +23,9 @@ The platform follows a sequential learning model where students must complete le
 | Authentication | JWT via HttpOnly cookies (djangorestframework-simplejwt) |
 | OAuth          | Google OAuth via django-allauth                          |
 | Media Storage  | Cloudinary                                               |
-| Payments       | Stripe (PaymentIntent API)                               |
+| Video Hosting  | Cloudinary (adaptive HLS via `sp_auto` streaming profile)|
+| Payments       | Stripe (PaymentIntent API), swappable via PaymentGateway |
+| Email          | SendGrid via django-anymail                              |
 
 ### Frontend (Next.js)
 
@@ -37,6 +39,7 @@ The platform follows a sequential learning model where students must complete le
 | UI Components    | shadcn/ui (Radix primitives)              |
 | Forms            | React Hook Form + Zod validation          |
 | HTTP Client      | Axios with interceptors                   |
+| Video Player     | Vidstack + hls.js (adaptive HLS)          |
 
 ---
 
@@ -50,13 +53,15 @@ CustomUser (email as USERNAME_FIELD)
 
 Course
 ├── Section (ordered)
-│   ├── Lecture (ordered, has video_url, duration)
+│   ├── Lecture (ordered, video_public_id, video_status, duration)
 │   └── Quiz (1 per section, questions_count)
 │       ├── Question (ordered)
 │       │   └── Choice (is_correct flag)
 │       └── QuizAttempt (score, passed boolean)
-├── Order (pending/paid/failed/refunded)
-│   └── Transaction (Stripe payment records)
+├── Review (one per student per course, requires 100% completion)
+├── Order (pending/paid/failed/refunded, payment_gateway, idempotency_key)
+│   └── Transaction (gateway_reference, gateway_charge_id, receipt_url)
+├── ProcessedWebhookEvent (event_id deduplication)
 └── LectureProgress (completed_at timestamp)
 ```
 
@@ -73,15 +78,18 @@ Course
 
 ### Authentication System (Complete)
 
-- **Email/Password Registration** with OTP verification (6-digit code)
+- **Email/Password Registration** with OTP verification (6-digit code, real email via SendGrid)
 - **Login** with JWT stored in HttpOnly cookies
 - **Google OAuth** login and registration
 - **Password Management**:
   - Forget password via OTP
   - Change password (authenticated)
   - Set password for Google users (OTP flow)
+  - Backend password strength validation (Django validators) on all password endpoints
 - **Token Refresh** automatic via axios interceptors
 - **Logout** with token blacklisting
+- **Rate Limiting**: login (5/min), OTP send/verify (3/min), registration (3/min)
+- **Security**: All `print()` replaced with structured logging, consistent `CookieJWTAuthentication`
 
 ### Course Management (Complete)
 
@@ -108,21 +116,31 @@ Course
 ### Enrollment & Payments (Complete)
 
 - **Payment Flow**:
-  - Create Stripe PaymentIntent
-  - Webhook handling for payment success/failure
+  - Create Stripe PaymentIntent (embedded `PaymentElement` — supports card, Apple Pay, Google Pay)
+  - Webhook handling for payment success/failure with event deduplication (`ProcessedWebhookEvent`)
   - Automatic enrollment on successful payment
-- **Order/Transaction Tracking**: Full payment history
+  - Payment confirmation emails with Stripe-hosted receipt links
+  - **Free course enrollment** (price == 0 bypasses payment flow entirely)
+  - **Payment retry** for failed/pending orders (checks PI status, creates new PI if canceled)
+- **Refunds**: Admin-only endpoint with 14-day window, enrollment deactivation, refund confirmation email
+- **Order/Transaction Tracking**: Full billing dashboard with receipt URLs and actual payment methods
+- **Payment Gateway Abstraction** (`apps/enrollment/payments/`):
+  - Strategy/DIP pattern: `PaymentGateway` ABC → `StripeGateway` adapter → `get_payment_gateway()` factory
+  - `CheckoutService`, `RefundService`, fulfillment layer, `WebhookDispatcher`
+  - Adding a second gateway (e.g., PayPal) = one new adapter class + one factory elif
+  - No `stripe` import outside `stripe_gateway.py`
 - **Stripe Integration**: Test mode ready
 
-### Student Progress Tracking (Backend Complete)
+### Student Progress Tracking (Complete — Backend + Frontend)
 
-- **Dashboard APIs**:
+- **Dashboard** (full frontend implementation):
   - Overview: completed courses, in-progress courses, total minutes spent
   - Course list with progress percentages
-  - Detailed course view with section progress
-- **Lecture Completion**: Mark lectures complete (unlocked sequentially)
+  - Detailed course view with section progress and lecture/quiz status
+- **Video Streaming**: Cloudinary adaptive HLS with Vidstack player, access-gated per enrollment
+- **Lecture Completion**: Mark lectures complete (unlocked sequentially, serializer-validated)
 - **Quiz System**:
-  - Submit answers and get scored
+  - Submit answers and get scored (serializer-validated)
   - Pass/fail based on threshold
   - View correct answers after passing
   - Prevent retakes after passing
@@ -139,50 +157,13 @@ Course
 
 ## What Seems Incomplete / Missing
 
-### 1. Student Dashboard (Frontend)
-
-**Status**: Backend APIs exist, no frontend pages
-**References**:
-
-- Code links to `/dashboard/${course.id}` (CourseDetailPage.tsx:98)
-- User avatar dropdown links to `/dashboard` and `/dashboard/profile`
-- Middleware proxy.ts references `/dashboard` as protected route
-
-**Missing Pages**:
-
-- Dashboard home with stats overview
-- Enrolled course detail with video player
-- Section/quiz view
-- Progress tracking UI
-
-### 3. Video Player
-
-**Status**: Not implemented
-**Needed For**: Lecture viewing in dashboard
-**Model Has**: `video_url` field on lectures
-**Missing**: Video player component (likely needs React Player or similar)
-
-### 4. Certificate Generation
+### 1. Certificate Generation
 
 **Status**: Not implemented
 **Hint**: Course detail page mentions "Certificate of completion"
 **Missing**: Certificate generation and download functionality
 
-### 5. Reviews System
-
-**Status**: Complete
-**Implemented**:
-
-- Review model with one-per-student-per-course constraint
-- Eligibility checks (enrolled + 100% course completion)
-- Submit/edit/delete own reviews (student dashboard)
-- Public course reviews carousel on course detail page (paginated, newest first)
-- Course aggregate rating/count (denormalized, recomputed on every write)
-- Instructor aggregate rating/count (computed on read, published courses only)
-- Admin review removal endpoint
-- "Not yet rated" state for courses/instructors with no reviews
-
-### 6. Instructor Dashboard
+### 2. Instructor Dashboard
 
 **Status**: Not implemented
 **Current**: Instructor APIs exist (course/section/lecture/quiz CRUD)
@@ -192,13 +173,12 @@ Course
 - Course creation/editing UI
 - Student analytics view
 
-### 7. Cart/Wishlist
+### 3. Cart/Wishlist
 
 **Status**: Not implemented
-**UI Shows**: "Add to Cart" button (CourseEnrollCard.tsx:27)
-**Missing**: Cart state management, checkout flow
+**Missing**: Cart state management, wishlist functionality
 
-### 8. Real-time Features
+### 4. Real-time Features
 
 **Status**: Not implemented
 **Potential Needs**:
@@ -207,16 +187,15 @@ Course
 - Live chat with instructors
 - WebSocket for progress sync
 
-### 9. Search Indexing
+### 5. Search Indexing
 
 **Status**: Basic filtering works
 **Potential Enhancement**: Elasticsearch/Algolia for better search performance
 
-### 10. Email System
+### 6. Instructor Upload UI
 
-**Status**: Console backend (development only)
-**Current**: Emails print to console
-**Needed**: SMTP integration for production (SendGrid/AWS SES)
+**Status**: Backend ready (upload signature endpoint exists), no frontend UI
+**Missing**: Instructor lecture-authoring page with direct-to-Cloudinary chunked upload
 
 ---
 
@@ -249,12 +228,32 @@ Course
 
 | Corresponding `/sections/`, `/lectures/`, `/quizzes/` endpoints exist for each role
 
+| Endpoint                         | Access | Description                       |
+| -------------------------------- | ------ | --------------------------------- |
+| `/video/upload-signature/`       | POST   | Cloudinary upload credentials     |
+| `/video/webhook/`                | POST   | Cloudinary video processing webhook|
+
 ### Enrollment (`/enrollment/`)
 
-| Endpoint                  | Description                 |
-| ------------------------- | --------------------------- |
-| `/create-payment-intent/` | Create Stripe PaymentIntent |
-| `/payment-webhook/`       | Stripe webhook handler      |
+| Endpoint                         | Description                          |
+| -------------------------------- | ------------------------------------ |
+| `/create-payment-intent/`        | Create Stripe PaymentIntent          |
+| `/order-details/`                | Get order details (supports retry)   |
+| `/enroll-free/`                  | Free course enrollment               |
+| `/webhook/<gateway>/`            | Payment webhook (gateway-routed)     |
+| `/payment-webhook/`              | Stripe webhook (legacy alias)        |
+| `/refund-order/`                 | Admin-only refund (14-day window)    |
+| `/billing/summary/`              | Student billing summary              |
+| `/billing/orders/`               | Student order history with receipts  |
+
+### Reviews (`/reviews/`)
+
+| Endpoint                         | Description                          |
+| -------------------------------- | ------------------------------------ |
+| `/course/<id>/reviews/`          | Public course reviews (paginated)    |
+| `/my-review/<course_id>/`        | Student's own review (GET/POST/PATCH/DELETE) |
+| `/eligibility/<course_id>/`      | Check review eligibility             |
+| `/admin/remove/<review_id>/`     | Admin review removal                 |
 
 ### Progress (`/progress/`)
 
@@ -275,26 +274,33 @@ Course
 ```
 backend/
 ├── apps/
-│   ├── authentication/    # User models, JWT auth, OAuth
+│   ├── authentication/    # User models, JWT auth, OAuth, OTP
 │   ├── course/           # Course, Section, Lecture, Quiz models
-│   ├── enrollment/       # Orders, Transactions, Stripe integration
-│   └── progress/         # Progress tracking, quiz attempts
+│   │   └── video/        # Video provider abstraction (Cloudinary adapter)
+│   ├── enrollment/       # Orders, Transactions, payments
+│   │   └── payments/     # Payment gateway abstraction (Stripe adapter)
+│   ├── progress/         # Progress tracking, quiz attempts
+│   └── reviews/          # Course reviews & ratings
 ├── config/               # Settings, URLs, WSGI/ASGI
 
 front-end/
 ├── src/
 │   ├── app/
 │   │   ├── (main)/       # Public routes (Home, Courses, Course Detail)
-│   │   └── (auth)/       # Auth routes (Login, Register, OTP, Forget Password)
+│   │   ├── (auth)/       # Auth routes (Login, Register, OTP, Forget Password)
+│   │   └── dashboard/    # Student dashboard (overview, courses, lectures, quizzes, billing)
 │   ├── components/
-│   │   ├── atoms/        # Basic UI (button, input, avatar)
+│   │   ├── atoms/        # Basic UI (button, input, avatar, video player)
 │   │   ├── molecules/    # Composite (CourseCard, Filters)
 │   │   └── organisms/    # Complex sections (Hero, NavBar, Footer)
 │   ├── featuers/
 │   │   ├── auth/         # Auth feature (API, hooks, components, types)
-│   │   └── courses/      # Courses feature
+│   │   ├── courses/      # Courses feature
+│   │   ├── enrollment/   # Enrollment, checkout, billing
+│   │   ├── progress/     # Student progress, quiz, lecture tracking
+│   │   └── reviews/      # Course reviews & ratings
 │   ├── lib/              # Utilities (axios, toast, queryProvider)
-│   └── store/            # Zustand stores, fake data
+│   └── store/            # Zustand stores
 ```
 
 ---
@@ -302,11 +308,15 @@ front-end/
 ## Security Considerations
 
 - **JWT in HttpOnly cookies** (not localStorage) for XSS protection
-- **CORS** configured for localhost:3000
-- **CSRF protection** on webhook endpoints
+- **CORS** via `CORS_ALLOWED_ORIGINS` env var (not `CORS_ALLOW_ALL_ORIGINS`)
+- **Rate limiting**: login (5/min), OTP (3/min), registration (3/min)
+- **Password validation**: Django validators enforced on all password endpoints
+- **Webhook verification**: Stripe signature, Cloudinary SHA1 signature
 - **Role-based access control** on all viewsets
-- **Stripe webhook signature** verification
+- **Refresh token rotation** enabled (`ROTATE_REFRESH_TOKENS: True`)
+- **Structured logging** (no `print()` statements, no sensitive data in logs)
 - **Cloudinary** for secure media storage
+- **Video access gating**: streaming URLs only served to enrolled students/course owner/admins
 
 ---
 
@@ -324,25 +334,42 @@ front-end/
 
 - Database credentials (PostgreSQL)
 - `SECRET_KEY`, `DEBUG`
+- `ALLOWED_HOSTS` (comma-separated)
+- `CORS_ALLOWED_ORIGINS` (comma-separated)
 - `STRIPE_PUBLISHABLE_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`
+- `SENDGRID_API_KEY`, `DEFAULT_FROM_EMAIL`, `SERVER_EMAIL`
 - `CLOUDINARY_*` credentials
+- `CLOUDINARY_VIDEO_WEBHOOK_URL`
 - `GOOGLE_CLIENT_ID`, `GOOGLE_SECRET`
 - `JWT_COOKIE_SETTINGS`
+- `PAYMENT_GATEWAY` (default: `stripe`)
+- `VIDEO_PROVIDER` (default: `cloudinary`)
 
 **Frontend (.env.local)**:
 
 - `NEXT_PUBLIC_DEVELOPMENT_BACKEND_URL=http://localhost:8000`
+- `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
 
 ---
+
+### Reviews System (Complete)
+
+- **Review model** with one-per-student-per-course constraint
+- **Eligibility checks** (enrolled + 100% course completion)
+- **Submit/edit/delete** own reviews (student dashboard)
+- **Public course reviews** carousel on course detail page (paginated, newest first)
+- **Course aggregate** rating/count (denormalized, recomputed on every write)
+- **Instructor aggregate** rating/count (computed on read, published courses only)
+- **Admin review removal** endpoint
+- **"Not yet rated"** state for courses/instructors with no reviews
 
 ## Next Logical Steps
 
 If continuing development, priority order would likely be:
 
-1. **Student Dashboard** - Core learning experience (video player, progress, quizzes)
-2. **Stripe Frontend Integration** - Actually enable enrollments
-3. **Video Player** - Essential for consuming content
-4. **Instructor Dashboard** - Enable content creation
-5. **Reviews System** - Social proof for courses
-6. **Certificate Generation** - Completion rewards
-7. **Production Deployment** - Email, proper CORS, security headers
+1. **Instructor Dashboard** - Content creation/editing UI, student analytics
+2. **Instructor Upload UI** - Frontend for direct-to-Cloudinary video uploads (backend ready)
+3. **Certificate Generation** - Completion rewards
+4. **Cart/Wishlist** - Shopping cart and wishlist functionality
+5. **Real-time Features** - Notifications, progress sync
+6. **Production Deployment** - Domain, SSL, proper CORS origins, monitoring

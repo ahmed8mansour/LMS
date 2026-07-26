@@ -18,9 +18,9 @@ urlpatterns = [
 
     path('user/register/verifyOTP/' , UserRegisterVerifyOTPView.as_view() , name="user_verifyOTP"),
     path('user/register/sendOTP/' , UserRegisterSendOTPView.as_view() , name="user_register"),
-    path('user/resendOTP/' , UserResendOTPView.as_view() , name="user_verifyOTP"),
+    path('user/resendOTP/' , UserResendOTPView.as_view() , name="user_resendOTP"),
     path('user/login/' , UserLoginView.as_view() , name="user_login"),
-    path('user/logout/' , UserLogoutView.as_view() , name="user_login"),
+    path('user/logout/' , UserLogoutView.as_view() , name="user_logout"),
 
 
     path('user/forgetpassword/sendOTP/' , UserForgetPasswordSendOTPView.as_view() , name="user_forget_password"),

@@ -3,57 +3,51 @@ import { Button } from "@/components/atoms/button";
 import { FaArrowRight } from "react-icons/fa";
 import { MdOndemandVideo } from "react-icons/md";
 import { IoInfiniteOutline } from "react-icons/io5";
-import { RiArticleLine } from "react-icons/ri";
 import { FaTv } from "react-icons/fa6";
 import { LiaCertificateSolid } from "react-icons/lia";
-import { usePathname } from "next/navigation";
 import { useParams } from "next/navigation";
 import { useCreatePaymentIntent } from "../hooks/useCreatePaymentIntent";
-import { useRouter } from "next/navigation";
+import { useFreeEnrollment } from "../hooks/useFreeEnrollment";
 import ButtonLoading from "@/components/atoms/buttonloading";
 type props = {
-    price: string 
+    price: string
     totalHourse : string
 }
 export default function CourseEnrollCard({price , totalHourse}:props) {
     const params = useParams()
-    const router = useRouter()
-    const id = params.id 
+    const id = params.id
 
-    const { mutate:DoCreatePaymentIntent, isPending , isSuccess , isError  } = useCreatePaymentIntent();
+    const { mutate: DoCreatePaymentIntent, isPending: isPaymentPending } = useCreatePaymentIntent();
+    const { mutate: DoFreeEnroll, isPending: isFreePending } = useFreeEnrollment();
 
-    const  CreatePayment = () => {
-        DoCreatePaymentIntent(id as string,{
-                onSuccess : (data)=>{
-                    // Navigate to checkout page with order ID in URL
-                    router.replace(`/courses/checkout/${data.order.id}/`)
-                }
-            }
-        )
+    const isFree = parseFloat(price) === 0;
+    const isPending = isPaymentPending || isFreePending;
 
+    const handleEnroll = () => {
+        if (isFree) {
+            DoFreeEnroll(id as string);
+        } else {
+            DoCreatePaymentIntent(id as string);
+        }
     }
 
     return (
             <div className="flex flex-col gap-6">
                 <div className="flex items-center gap-1">
-                    <p className="font-extrabold text-darktext text-3xl">${price}</p>
-                    <p className="font-normal text-sm text-graytext2 line-through"> $149.99 </p>
-                    <p className="font-normal text-sm text-[#16A34A]"> 40% Off </p>
+                    <p className="font-extrabold text-darktext text-3xl">
+                        {isFree ? "Free" : `$${price}`}
+                    </p>
                 </div>
                 <div>
-                    <Button className="h-12 w-full mb-3" variant={"darkmint"} onClick={CreatePayment} disabled={isPending}>
-                        
-                        {isPending ? 
+                    <Button className="h-12 w-full mb-3" variant={"darkmint"} onClick={handleEnroll} disabled={isPending}>
+                        {isPending ?
                             <ButtonLoading />
                             :
-                            <>Enroll Now <FaArrowRight /></>
+                            <>{isFree ? "Enroll for Free" : "Enroll Now"} <FaArrowRight /></>
                         }
                     </Button>
-                    <Button className="h-12 w-full bg-darkbg" variant={"outline"}>
-                        Add to Cart
-                    </Button>
                 </div>
-                <p className="text-center text-graytext2 text-xs font-normal">30-Day Money-Back Guarantee</p>
+                {!isFree && <p className="text-center text-graytext2 text-xs font-normal">30-Day Money-Back Guarantee</p>}
                 <div className="">
                     <h2 className="font-bold text-sm text-darktext mb-4">This course includes:</h2>
                     <div className="flex items-center gap-2 text-graytext2 text-sm font-normal mb-2">

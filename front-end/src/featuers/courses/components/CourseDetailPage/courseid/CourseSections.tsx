@@ -22,8 +22,7 @@ export default function CourseSections({Sections , totalDuration , totalLectures
                 </div>
                 <div className="course_sections">
 
-                    {Sections?.map((section , index) =>{ 
-                    console.log(section)    
+                    {Sections?.map((section , index) =>{
                     return (
                         <Accordion
                         key={index}

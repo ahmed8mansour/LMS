@@ -84,12 +84,15 @@ export interface Section {
     quiz: Quiz | null
 }
 
+export type VideoStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED'
+
 export interface Lecture {
     id: number
     title: string
     duration: string
     order: number
-    video_url: string
+    video_url: string | null
+    video_status: VideoStatus
     is_completed: boolean
     is_unlocked: boolean
 }

@@ -1,3 +1,4 @@
+import type { AxiosError } from 'axios';
 import { useMutation } from '@tanstack/react-query';
 import { authAPI } from '../api/auth.api';
 import { useAuthStore } from '@/store/auth.store';
@@ -16,7 +17,7 @@ export function useRegister() {
             setPendingEmail(pending_email)
             toastsuccess('Register is successful', data.message)
         },
-        onError(error: any, variables, onMutateResult, context) {
+        onError(error: AxiosError, variables, onMutateResult, context) {
             handleAuthError(error, 'Register Failed')
         },
     })

@@ -12,12 +12,16 @@ from django.utils import timezone
 from apps.course.models import Lecture , Section , Quiz , Question , Choice
 from apps.enrollment.models import Enrollment
 from django.conf import settings
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 from .serializers import (
     StudentDashboardOverviewSerializer , SectionProgressSerializer ,
     CourseOverviewSerializer , EnrolledCourseSerializer ,
-    LectureCompleteResponseSerializer , QuizSubmitSerializer , QuizSubmitResponseSerializer,
+    LectureCompleteResponseSerializer , MarkLectureCompleteSerializer ,
+    QuizSubmitSerializer , QuizSubmitResponseSerializer,
     QuizDataSerializer , LectureProgressSerializer
 )
 from .models import LectureProgress , QuizAttempt , QuizAttemptAnswer
@@ -38,9 +42,12 @@ class StudentDashboardOverviewView(APIView):
         user_enrollments = Enrollment.objects.filter(user=user , is_active=True).select_related('course')
 
         if not user_enrollments.exists():
-            return Response({"error":"You didn't joined any courses yet"},status=status.HTTP_200_OK)
+            return Response({
+                "stats": {"completed_courses": 0, "inprogress_courses": 0, "total_mins_spent": 0},
+                "courses": []
+            }, status=status.HTTP_200_OK)
 
-        print(user_enrollments)
+        logger.debug("Dashboard overview requested for user_id=%s", user.id)
         # _____stats_____________________
 
         # getting : total mins_spent
@@ -87,9 +94,7 @@ class StudentDashboardCourses(APIView):
         user_enrollments = Enrollment.objects.filter(user=user , is_active=True).select_related('course')
 
         if not user_enrollments.exists():
-            return Response({"error":"You didn't joined any courses yet"},status=status.HTTP_200_OK)
-
-
+            return Response([], status=status.HTTP_200_OK)
 
         # getting : total mins_spent
         completed_lectures = LectureProgress.objects.filter(
@@ -100,7 +105,7 @@ class StudentDashboardCourses(APIView):
 
 
         sorted_courses = get_student_sorted_courses(user, user_enrollments, completed_lectures)
-        print(sorted_courses)
+        logger.debug("Dashboard courses requested for user_id=%s", user.id)
 
         serializer = CourseOverviewSerializer(sorted_courses , many=True)
 
@@ -235,22 +240,16 @@ class MarkLectureCompleteView(APIView):
     permission_classes = [IsAuthenticated]
     
     def post(self, request):
-        """
-        authenticated
-        post :
-        body : {
-        lecture : id,
-        }
-        """
         try:
             user_profile = StudentProfile.objects.get(user=request.user)
         except StudentProfile.DoesNotExist:
             return Response({"error":"Student profile not found"},status=status.HTTP_404_NOT_FOUND)
-        data = request.data
-        lecture_id = data['lecture_id']
-        if not lecture_id :
-            return Response({"error": "please provide the id of the lecture "}, status=status.HTTP_404_NOT_FOUND)
-            
+
+        serializer = MarkLectureCompleteSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        lecture_id = serializer.validated_data['lecture_id']
         lecture = Lecture.objects.select_related('section__course').filter(id=lecture_id).first()
         if not lecture:
             return Response({"error": "Lecture not found"}, status=status.HTTP_404_NOT_FOUND)
@@ -305,9 +304,13 @@ class SubmitQuizView(APIView):
             user_profile = StudentProfile.objects.get(user=request.user)
         except StudentProfile.DoesNotExist:
             return Response({"error":"Student profile not found"},status=status.HTTP_404_NOT_FOUND)
-        quiz_id = request.data['quiz_id']
-        if not quiz_id:
-            return Response({"error": "please provide the id of the quiz"}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = QuizSubmitSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        quiz_id = serializer.validated_data['quiz_id']
+        answers_data = serializer.validated_data['answers']
 
         quiz = Quiz.objects.select_related('section__course').filter(id=quiz_id).first()
         if not quiz:
@@ -319,15 +322,9 @@ class SubmitQuizView(APIView):
 
         if not is_quiz_unlocked(user_profile, quiz):
             return Response({"error": "Quiz is locked. Complete all lectures first."}, status=status.HTTP_403_FORBIDDEN)
-        
 
-        if QuizAttempt.objects.filter(user = user_profile , quiz=quiz_id , passed=True).exists():
-            return Response({"error": "You are passed with this quiz"}, status=status.HTTP_208_ALREADY_REPORTED)
-
-
-        serializer = QuizSubmitSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        answers_data = serializer.validated_data['answers']
+        if QuizAttempt.objects.filter(user=user_profile, quiz=quiz_id, passed=True).exists():
+            return Response({"error": "You have already passed this quiz"}, status=status.HTTP_409_CONFLICT)
 
         questions = Question.objects.filter(quiz=quiz).prefetch_related('choice')
         question_map = {q.id: q for q in questions}
@@ -339,12 +336,12 @@ class SubmitQuizView(APIView):
         if submitted_question_ids != question_ids:
             missing = question_ids - submitted_question_ids
             extra = submitted_question_ids - question_ids
-            errors = {}
+            parts = []
             if missing:
-                errors['missing_questions'] = list(missing)
+                parts.append(f"Missing questions: {list(missing)}")
             if extra:
-                errors['invalid_questions'] = list(extra)
-            return Response(errors, status=status.HTTP_400_BAD_REQUEST)
+                parts.append(f"Invalid questions: {list(extra)}")
+            return Response({"error": "; ".join(parts)}, status=status.HTTP_400_BAD_REQUEST)
 
 
         # store the REAL question with their choices in a set of tuple 

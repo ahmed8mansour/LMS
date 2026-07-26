@@ -1,4 +1,7 @@
 from rest_framework import serializers
+from django.db import transaction
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from .models import CustomUser  , PasswordResetToken, EmailOTP, StudentProfile, InstructorProfile, AdminProfile
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -8,9 +11,17 @@ from cloudinary.utils import cloudinary_url
 from allauth.socialaccount.models import SocialAccount
 from django.contrib.auth import authenticate
 from rest_framework import status
-from .utils import send_otp_email
+from apps.enrollment.service import EmailService , OTPEmailSender
 from django.forms.models import model_to_dict
 from.utils import exchange_code_for_user_info
+
+
+def _validate_password_strength(password, user=None):
+    """Run Django's AUTH_PASSWORD_VALIDATORS against the given password."""
+    try:
+        validate_password(password, user=user)
+    except DjangoValidationError as e:
+        raise serializers.ValidationError({'password': list(e.messages)})
 
 
 class StudentProfileSerializer(serializers.ModelSerializer):
@@ -78,24 +89,31 @@ class CustomUserRegisterSendOTPSerializer(serializers.ModelSerializer):
             'password': {'write_only': True}
         }
 
+    def validate_password(self, value):
+        _validate_password_strength(value)
+        return value
+
     def create(self, validated_data):
-        role= validated_data['role']
-        
-        print(validated_data)
-        if role == 'student':
-            user = CustomUser.objects.create_user(**validated_data)
-        elif role == 'instructor':
-            user = CustomUser.objects.create_instructor(**validated_data)
-        elif role == 'admin':
-            user = CustomUser.objects.create_superuser(**validated_data)
-        else:
-            raise serializers.ValidationError({'error_message': 'role not provided'})
-        
-        user.is_active = False
-        user.is_email_verified = False
-        user.save()
-        otp = EmailOTP.create_otp(user , purpose='registration')
-        send_otp_email(user , otp.code , purpose='registration')
+        role = validated_data['role']
+
+        with transaction.atomic():
+            if role == 'student':
+                user = CustomUser.objects.create_user(**validated_data)
+            elif role == 'instructor':
+                user = CustomUser.objects.create_instructor(**validated_data)
+            elif role == 'admin':
+                user = CustomUser.objects.create_superuser(**validated_data)
+            else:
+                raise serializers.ValidationError({'error_message': 'role not provided'})
+
+            user.is_active = False
+            user.is_email_verified = False
+            user.save()
+            otp = EmailOTP.create_otp(user, purpose='registration')
+
+            success = EmailService(OTPEmailSender(user, otp.code, purpose='registration')).process_sending()
+            if not success:
+                raise serializers.ValidationError({'error': 'Failed to send OTP email. Please try again.'})
 
         self.context['user'] = user
         self.context['otp_sent'] = True
@@ -107,8 +125,6 @@ class CustomUserRegisterSendOTPSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
 
         data = super().to_representation(instance)
-        print(data)
-        print(data)
         response_data={
             'message':'Registration successful! Please check your email for OTP.' ,
             'user_data':data,
@@ -156,19 +172,18 @@ class UserResnedOTPSerializer(serializers.Serializer):
         return data
     
     def save(self):
-
         email = self.validated_data['email']
         user = CustomUser.objects.get(email=email)
-        new_otp = EmailOTP.create_otp(user=user , purpose='registration')
-        send_otp_email(user=user , otp_code=new_otp.code ,purpose='registration' )
+        new_otp = EmailOTP.create_otp(user=user, purpose='registration')
 
-        response_data={
-            'message':'Resent OTP successful! Please check your email for OTP.' ,
+        success = EmailService(OTPEmailSender(user, new_otp.code, purpose='registration')).process_sending()
+        if not success:
+            raise serializers.ValidationError({'error': 'Failed to send OTP email. Please try again.'})
+
+        return {
+            'message': 'Resent OTP successful! Please check your email for OTP.',
             'next_step': 'verify_otp',
-            
         }
-
-        return response_data
 
 
 class UserRegisterVerifyOTPSerializer(serializers.Serializer):
@@ -243,15 +258,6 @@ class UserForgetPasswordSendOTPSerializer(serializers.Serializer):
             })
         
         
-        # last_otp = EmailOTP.objects.filter(
-        #     user=user, 
-        #     purpose='forget_password'
-        # ).order_by('-created_at').first()
-
-        # if last_otp and last_otp.is_valid():
-        #     raise serializers.ValidationError({
-        #         'error': "Your OTP hasn't expired, please use it"
-        #     }) 
 
         self.user = user
         return data
@@ -259,12 +265,15 @@ class UserForgetPasswordSendOTPSerializer(serializers.Serializer):
     
     def save(self, **kwargs):
         user = self.user
-        otp_code = EmailOTP.create_otp(user=user, purpose='forget_password')
-        send_otp_email(user=user, otp_code=otp_code.code, purpose='forget_password')
+        otp = EmailOTP.create_otp(user=user, purpose='forget_password')
+
+        success = EmailService(OTPEmailSender(user, otp.code, purpose='forget_password')).process_sending()
+        if not success:
+            raise serializers.ValidationError({'error': 'Failed to send OTP email. Please try again.'})
 
         return {
-            'message':'Please Check ur Email , and Fill the OTP to change ur password',
-            'next_step':"fill the otp then add new password"
+            'message': 'Please check your email and enter the OTP to change your password.',
+            'next_step': 'fill the otp then add new password',
         }
 
 class UserForgetPasswordVerifyOTPSerializer(serializers.Serializer):
@@ -320,9 +329,13 @@ class UserForgetPasswordVerifyOTPSerializer(serializers.Serializer):
 class UserForgetPasswordSetnewoneSerializer(serializers.Serializer):
     new_password = serializers.CharField(write_only=True, style={'input_type': 'password'})
 
+    def validate_new_password(self, value):
+        _validate_password_strength(value)
+        return value
+
     def validate(self, data):
         new_password = data.get('new_password')
-        
+
         # Get reset token from context (set by view from cookies)
         reset_token_str = self.context.get('reset_token')
         
@@ -429,17 +442,20 @@ class UserLoginSerializer(serializers.Serializer):
 
 class UserSetPasswordSerializer(serializers.Serializer):
     password = serializers.CharField(write_only=True, style={'input_type': 'password'})
-    
+
+    def validate_password(self, value):
+        _validate_password_strength(value)
+        return value
+
     def validate(self, data):
         user  = self.context.get('request').user
         new_password  = data.get('password')
-        
 
         if user.has_usable_password():
             raise serializers.ValidationError({
                 'error':'You already have a password. Use "Change Password" instead.'
             })
-        
+
         return data
 
     def save(self):
@@ -456,7 +472,7 @@ class UserChangePasswordSerializer(serializers.Serializer):
     old_password = serializers.CharField(write_only=True, style={'input_type': 'password'})
     new_password = serializers.CharField(write_only=True, style={'input_type': 'password'})
     new_password_confirm = serializers.CharField(write_only=True, style={'input_type': 'password'})
-    
+
     def validate(self, data):
         user  = self.context.get('request').user
         old_password  = data.get('old_password')
@@ -466,8 +482,8 @@ class UserChangePasswordSerializer(serializers.Serializer):
         if not user.has_usable_password():
             raise serializers.ValidationError({
                 'error':"You Don't have a password . Set a password first."
-            })  
-        
+            })
+
         if not user.check_password(old_password):
             raise serializers.ValidationError({
                 'error':"Current password is incorrect"
@@ -478,8 +494,9 @@ class UserChangePasswordSerializer(serializers.Serializer):
                 'password_confirm': 'Passwords do not match'
             })
 
-        else :
-            return data
+        _validate_password_strength(new_password, user=user)
+
+        return data
 
     def save(self):
         user = self.context.get('request').user
@@ -660,12 +677,16 @@ class GoogleSetPasswordSendOTPSerializer(serializers.Serializer):
     
     def save(self, **kwargs):
         user = self.validated_data['user']
-        otp_code = EmailOTP.create_otp(user=user, purpose='google_set_password')
-        send_otp_email(user=user, otp_code=otp_code.code, purpose='google_set_password')
+        otp = EmailOTP.create_otp(user=user, purpose='google_set_password')
+
+        success = EmailService(OTPEmailSender(user, otp.code, purpose='google_set_password')).process_sending()
+        if not success:
+            raise serializers.ValidationError({'error': 'Failed to send OTP email. Please try again.'})
+
         return {
             'message': 'OTP sent successfully! Please check your email.',
             'email': user.email,
-            'next_step': 'verify_otp'
+            'next_step': 'verify_otp',
         }
 
 
@@ -735,11 +756,14 @@ class GoogleSetPasswordNewPasswordSerializer(serializers.Serializer):
     """
     new_password = serializers.CharField(write_only=True, style={'input_type': 'password'})
 
+    def validate_new_password(self, value):
+        _validate_password_strength(value)
+        return value
+
     def validate(self, data):
         user = self.context.get('request').user
         new_password = data.get('new_password')
 
-        
         if user.has_usable_password():
             raise serializers.ValidationError({
                 'error': 'This user has already set a password'
@@ -775,9 +799,7 @@ class GoogleSetPasswordNewPasswordSerializer(serializers.Serializer):
         user = self.validated_data['user']
         new_password = self.validated_data['new_password']
 
-        # Set the password and reset authorization flag
         user.set_password(new_password)
-        user.can_change_password = False
         user.save()
 
         user_data = UserDataSerializer(user).data

@@ -1,3 +1,4 @@
+import type { AxiosError } from 'axios';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { authAPI } from '../api/auth.api';
 import { toastsuccess, handleAuthError , toasterror } from '@/lib/toast';
@@ -24,7 +25,7 @@ export function useUserChangePassword() {
         onSuccess(data: UserChangePasswordResponse, variables, context) {
             toastsuccess('Password Changed!', data.message || 'Password changed successfully!')
         },
-        onError(error: any) {
+        onError(error: AxiosError) {
             if (error?.message == "You don't have a password set. Please set a password before trying to change it.") {
                 toasterror('Password Change Failed', error.message)
             }else {

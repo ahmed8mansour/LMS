@@ -1,34 +1,50 @@
 from rest_framework.response import Response
-from datetime import datetime, timedelta
 from rest_framework.views import APIView
 
 from rest_framework import status
-from django.conf import settings
 from rest_framework.permissions import IsAuthenticated
 
 from apps.authentication.utils import CookieJWTAuthentication
 
 
 from rest_framework.generics import ListAPIView
-from .serializers import OrderSerializer , CreatePaymentSerializer, GetOrderDetailsSerializer, OrderDetailsResponseSerializer, OrderSummarySerializer, BillingSummarySerializer, StudentOrderHistorySerializer
+from .serializers import CreatePaymentSerializer, GetOrderDetailsSerializer, OrderSummarySerializer, BillingSummarySerializer, StudentOrderHistorySerializer, RefundOrderSerializer, FreeEnrollmentSerializer
 
-from django.db import transaction
 from django.db.models import Sum
 from apps.course.models import Course
-from .models import Order , Transaction , Enrollment
+from apps.course.permissions import isAdmin
+from .models import Order, Enrollment
 from .pagination import BillingPageNumberPagination
-import stripe
+from .payments.exceptions import PaymentException, DuplicatePaymentError, WebhookVerificationError
+from .payments.factory import get_payment_gateway
+from .payments.service import CheckoutService, RefundService
+from .payments.webhooks import WebhookDispatcher
+import logging
 
 from apps.course.serializers import CourseSerializer
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 
-# ==========================================
-# ==========================================
-# ==========================================
+logger = logging.getLogger(__name__)
 
-stripe.api_key = settings.STRIPE_SECRET_KEY
 
+_EXCEPTION_STATUS = {
+    'PaymentDeclinedError': status.HTTP_402_PAYMENT_REQUIRED,
+    'RefundNotAllowedError': status.HTTP_400_BAD_REQUEST,
+    'WebhookVerificationError': status.HTTP_400_BAD_REQUEST,
+    'PaymentNotFoundError': status.HTTP_404_NOT_FOUND,
+    'DuplicatePaymentError': status.HTTP_409_CONFLICT,
+    'GatewayError': status.HTTP_502_BAD_GATEWAY,
+}
+
+
+def _map_payment_exception(exc: PaymentException) -> Response:
+    """Single place mapping every payments-domain exception to an HTTP response, so no view branches on exception type itself."""
+    status_code = _EXCEPTION_STATUS.get(type(exc).__name__, status.HTTP_502_BAD_GATEWAY)
+    body = {'error': str(exc)}
+    if isinstance(exc, DuplicatePaymentError) and exc.order_id:
+        body['order_id'] = exc.order_id
+    return Response(body, status=status_code)
 
 
 class CreatePaymentIntentView(APIView):
@@ -36,61 +52,33 @@ class CreatePaymentIntentView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        serializer = CreatePaymentSerializer(data = request.data  , context={'request':request})
+        serializer = CreatePaymentSerializer(data=request.data, context={'request': request})
         if not serializer.is_valid():
-            return Response(serializer.errors , status=status.HTTP_400_BAD_REQUEST)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        course = Course.objects.get(id = serializer.validated_data['course'])
+        course = Course.objects.get(id=serializer.validated_data['course'])
+
         try:
-            with transaction.atomic():
-                order = Order.objects.create(
-                    user = request.user,
-                    course = course ,
-                    status = 'pending',
-                    amount = course.price,
-                    currency = 'USD'
-                )
+            order, attempt = CheckoutService().start_checkout(request.user, course)
+        except PaymentException as e:
+            return _map_payment_exception(e)
 
-                intent = stripe.PaymentIntent.create(
-                    amount=int(course.price * 100), # in cents
-                    currency='usd',
-                    automatic_payment_methods={
-                        'enabled': True,
-                        'allow_redirects': 'never'
-                    },
-                    metadata={
-                        'order_id' : order.id,
-                        'course_id' : course.id,
-                        'user_id' : request.user.id,
-                    }
-                )
-                order.stripe_payment_intent_id = intent.id
-                order.save()
-
-        except stripe.error.StripeError as e:
-            return Response(
-                {'error': 'something went wrong with stripe , try later'},
-                status=status.HTTP_502_BAD_GATEWAY
-            )
-        except Exception as e:
-            return Response(
-                {'error': 'something went wrong'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-
-        # Use serializer for clean data conversion
         order_serializer = OrderSummarySerializer(order)
 
         return Response({
-            'client_secret' : intent.client_secret,
-            'order' : order_serializer.data,
-        } , status=status.HTTP_200_OK)
+            'client_secret': attempt.client_secret,
+            'order': order_serializer.data,
+        }, status=status.HTTP_200_OK)
 
 
 class GetOrderDetailsView(APIView):
     """
-    Retrieve order details for state recovery after page refresh.
-    Validates order belongs to current user and is still pending.
+    Retrieve order details for state recovery after page refresh or payment retry.
+    Accepts pending and failed orders. Checks the PaymentIntent's actual status
+    and handles three cases:
+      - succeeded: reconcile (activate enrollment) and tell frontend to redirect
+      - canceled: mint a fresh PaymentIntent on the same order
+      - anything else: return the existing client_secret (PI is still live)
     """
     authentication_classes = [CookieJWTAuthentication]
     permission_classes = [IsAuthenticated]
@@ -98,10 +86,7 @@ class GetOrderDetailsView(APIView):
     def post(self, request):
         serializer = GetOrderDetailsSerializer(data=request.data)
         if not serializer.is_valid():
-            return Response(
-                {'error': serializer.errors},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         order_id = serializer.validated_data['order_id']
 
@@ -113,129 +98,158 @@ class GetOrderDetailsView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        # Security: Verify order belongs to current user
         if order.user_id != request.user.id:
             return Response(
                 {'error': 'You do not have permission to access this order'},
                 status=status.HTTP_403_FORBIDDEN
             )
 
-        # Security: Verify order is still pending
-        if order.status != 'pending':
+        if order.status not in ('pending', 'failed'):
             return Response(
                 {'error': f'Order is {order.status}, cannot proceed with payment'},
-                status=status.HTTP_404_NOT_FOUND
+                status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Get fresh client_secret from Stripe
+        gateway = get_payment_gateway(order.payment_gateway)
+
         try:
-            intent = stripe.PaymentIntent.retrieve(order.stripe_payment_intent_id)
-            client_secret = intent.client_secret
-        except stripe.error.StripeError:
-            return Response(
-                {'error': 'Failed to retrieve payment information from Stripe'},
-                status=status.HTTP_502_BAD_GATEWAY
-            )
+            attempt = gateway.retrieve_attempt(order.stripe_payment_intent_id)
+        except PaymentException as e:
+            return _map_payment_exception(e)
 
-        # Serialize response
+        if attempt.raw_status == 'succeeded':
+            from .payments import fulfillment
+            from .payments.dto import PaymentEvent
+            event = PaymentEvent(
+                event_id=f"recovery:{order.id}",
+                event_type='payment_intent.succeeded',
+                reference=attempt.reference,
+                charge_id=None,
+                receipt_url=None,
+                payment_method_type='card',
+                amount=order.amount,
+                currency=order.currency,
+            )
+            fulfillment.activate_enrollment(order, event)
+            return Response({
+                'already_paid': True,
+                'order_id': order.id,
+                'message': 'Payment already completed. Redirecting to course.',
+            }, status=status.HTTP_200_OK)
+
+        if attempt.raw_status == 'canceled':
+            from .payments.dto import PaymentRequest
+            try:
+                new_attempt = gateway.initiate_payment(PaymentRequest(
+                    amount=order.amount,
+                    currency=order.currency,
+                    order_id=str(order.id),
+                    metadata={
+                        'order_id': str(order.id),
+                        'course_id': str(order.course_id),
+                        'user_id': str(order.user_id),
+                    },
+                ))
+            except PaymentException as e:
+                return _map_payment_exception(e)
+
+            order.stripe_payment_intent_id = new_attempt.reference
+            order.status = 'pending'
+            order.save()
+            attempt = new_attempt
+
+        if order.status == 'failed':
+            order.status = 'pending'
+            order.save()
+
         response_data = {
             'order_id': order.id,
-            'client_secret': client_secret,
+            'client_secret': attempt.client_secret,
             'status': order.status,
             'amount': str(order.amount),
             'currency': order.currency,
-            'course': CourseSerializer(order.course).data
+            'course': CourseSerializer(order.course).data,
         }
 
         return Response(response_data, status=status.HTTP_200_OK)
 
 
-# stripe payment_intents confirm pi_3TDL3cEzoqWKETIS0kmfPgwN --payment-method pm_card_visa
 @method_decorator(csrf_exempt, name='dispatch')
-class StripeWebhookView(APIView):
-    def post(self , request):
-        payload = request.body 
-        sig_header = request.META.get("HTTP_STRIPE_SIGNATURE")      
-        
-        try : 
-            # التحقق من صحة الويبهوك 
-            event = stripe.Webhook.construct_event(
-                payload=payload,
-                sig_header=sig_header,
-                secret=settings.STRIPE_WEBHOOK_SECRET
-            ) 
-        except ValueError : 
-            return Response({'error': 'Invalid payload'}, status=400)
-        except stripe.error.SignatureVerificationError:
-            return Response({'error': 'Invalid signature'}, status=400)
-        
-        if event['type'] == 'payment_intent.succeeded':
-            self.handle_payment_succeeded(event['data']['object'])
+class PaymentWebhookView(APIView):
+    """
+    Verifies and dispatches a provider webhook. `gateway` is a URL kwarg
+    (default 'stripe') so a second provider gets its own endpoint
+    (`webhook/paypal/`) without a new view class — see WebhookDispatcher.
 
-        elif event['type'] == 'payment_intent.payment_failed':
-            self.handle_payment_failed(event['data']['object'])
+    Signature header extraction is currently Stripe-specific (Stripe-Signature);
+    when a second gateway is added its own signature header(s) will need
+    reading here too, since providers don't agree on a header name/shape.
+    """
 
-        # لازم ترجع 200 دايماً — حتى Stripe ما يعيد الإرسال
-        return Response({'status': 'received'}, status=200)
-    
-    def handle_payment_succeeded(self , payment_intent):
-
-        order_id = payment_intent['metadata'].get('order_id')
-        if not order_id:
-            return
-        try :
-            with transaction.atomic(): # 3 عمليات 
-                order = Order.objects.select_for_update().get(id = order_id)
-
-                if order.status == 'paid':
-                    return
-                # 1 خلي الاوردر مدفوع 
-                order.status = 'paid'
-                order.save()
-
-                # 2 سجل عملية الدفع 
-                Transaction.objects.create(
-                    order = order,
-                    status = 'paid',
-                    amount=payment_intent['amount'] / 100,  # رجّع من cents
-                    currency=payment_intent['currency'],
-                    stripe_payment_intent_id=payment_intent['id'],
-                    )
-                
-                # 3 سجل اليوزر في الكورس
-                Enrollment.objects.get_or_create(
-                    user = order.user,
-                    course = order.course,
-                    order = order,
-                    is_active= True,
-                )
-                
-        except Order.DoesNotExist:
-        # سجّل الخطأ بدون ما ترجع 400
-        # لأن 400 بيخلي Stripe يعيد الإرسال
-            pass
-
-    def handle_payment_failed(self, payment_intent):
-        order_id = payment_intent['metadata'].get('order_id')
-
-        if not order_id:
-            return
+    def post(self, request, gateway='stripe'):
+        payload = request.body
+        signature = request.META.get("HTTP_STRIPE_SIGNATURE", "")
 
         try:
-            order = Order.objects.get(id=order_id)
-            order.status = 'failed'
-            order.save()
+            WebhookDispatcher(gateway_name=gateway).dispatch(payload, signature)
+        except PaymentException as e:
+            # WebhookVerificationError is the one case worth telling the
+            # caller about; every other domain failure is logged and still
+            # answered 200 so the provider does not endlessly retry (matches
+            # the pre-refactor behavior of this endpoint).
+            if isinstance(e, WebhookVerificationError):
+                return Response({'error': 'Invalid signature'}, status=status.HTTP_400_BAD_REQUEST)
+            logger.error("Webhook processing error (gateway=%s): %s", gateway, e)
 
-            Transaction.objects.create(
-                order=order,
-                stripe_payment_intent_id=payment_intent['id'],
-                amount=payment_intent['amount'] / 100,
-                currency=payment_intent['currency'],
-                status='failed',
+        return Response({'status': 'received'}, status=status.HTTP_200_OK)
+
+
+class FreeEnrollmentView(APIView):
+    authentication_classes = [CookieJWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = FreeEnrollmentSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        course_id = serializer.validated_data['course_id']
+
+        try:
+            course = Course.objects.get(id=course_id, is_published=True)
+        except Course.DoesNotExist:
+            return Response({'error': 'Course not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        if course.price != 0:
+            return Response({'error': 'This course is not free'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if Enrollment.objects.filter(user=request.user, course=course, is_active=True).exists():
+            return Response({'error': 'Already enrolled in this course'}, status=status.HTTP_400_BAD_REQUEST)
+
+        from django.db import transaction as db_transaction
+        with db_transaction.atomic():
+            order = Order.objects.create(
+                user=request.user,
+                course=course,
+                status='paid',
+                amount=0,
+                currency='USD',
+                stripe_payment_intent_id='free_enrollment',
+                payment_gateway='free',
             )
 
-        except Order.DoesNotExist:
-            pass
+            enrollment = Enrollment.objects.create(
+                user=request.user,
+                course=course,
+                order=order,
+                is_active=True,
+            )
+
+        return Response({
+            'message': 'Successfully enrolled',
+            'enrollment_id': enrollment.id,
+            'course_id': course.id,
+        }, status=status.HTTP_201_CREATED)
 
 
 class StudentBillingSummaryView(APIView):
@@ -268,4 +282,33 @@ class StudentOrderHistoryView(ListAPIView):
         return Order.objects.filter(
             user=self.request.user,
             status__in=['paid', 'refunded']
-        ).select_related('course').order_by('-created_at')
+        ).select_related('course').prefetch_related('transaction_set').order_by('-created_at')
+
+
+class AdminRefundOrderView(APIView):
+    authentication_classes = [CookieJWTAuthentication]
+    permission_classes = [isAdmin]
+
+    def post(self, request):
+        serializer = RefundOrderSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        order_id = serializer.validated_data['order_id']
+
+        try:
+            order = Order.objects.select_related('course').get(id=order_id)
+        except Order.DoesNotExist:
+            return Response({'error': 'Order not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            result = RefundService(order).process_refund()
+        except PaymentException as e:
+            return _map_payment_exception(e)
+
+        return Response({
+            'message': 'Refund processed successfully',
+            'order_id': order.id,
+            'refund_amount': str(result.amount_refunded),
+            'stripe_refund_id': result.reference,
+        }, status=status.HTTP_200_OK)

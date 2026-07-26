@@ -33,7 +33,8 @@ export function useProceedPayment() {
             return { success: true };
         },
         onSuccess: () => {
-            queryClient.removeQueries({ queryKey: ['order'] });
+            queryClient.invalidateQueries({ queryKey: ['order'] });
+            queryClient.invalidateQueries({ queryKey: ['dashboard'] });
             toastsuccess('Payment completed successfully! Redirecting...');
             router.replace('/dashboard');
         },
