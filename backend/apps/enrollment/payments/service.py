@@ -7,7 +7,7 @@ from django.utils import timezone
 from .dto import PaymentRequest, PaymentEvent
 from .exceptions import RefundNotAllowedError, DuplicatePaymentError
 from .factory import get_payment_gateway
-from . import fulfillment
+from .fulfillment import FulfillmentFacade
 
 logger = logging.getLogger(__name__)
 
@@ -73,15 +73,16 @@ class RefundService:
     """
     Processes admin-initiated refunds: validates eligibility, delegates the
     provider call and idempotent finalization (order/enrollment/counters/email)
-    to fulfillment.deactivate_enrollment — the same function the
+    to FulfillmentFacade.deactivate_enrollment — the same method the
     `charge.refunded` webhook handler uses, so a refund issued directly from
     the provider's dashboard is finalized identically to one issued here,
     whichever reaches the order first.
     """
 
-    def __init__(self, order, gateway=None):
+    def __init__(self, order, gateway=None, fulfillment=None):
         self.order = order
         self.gateway = gateway or get_payment_gateway(order.payment_gateway)
+        self.fulfillment = fulfillment or FulfillmentFacade()
 
     def process_refund(self):
         order = self.order
@@ -99,8 +100,8 @@ class RefundService:
         # Not a real webhook delivery, so there's no provider event id to dedupe
         # against — this path never touches ProcessedWebhookEvent (that's the
         # webhook dispatcher's job); the `order.status == 'refunded'` guard
-        # inside fulfillment.deactivate_enrollment is what makes this call
-        # idempotent (e.g. an admin double-clicking refund).
+        # inside FulfillmentFacade.deactivate_enrollment is what makes this
+        # call idempotent (e.g. an admin double-clicking refund).
         event = PaymentEvent(
             event_id=f"refund:{order.id}:{result.reference}",
             event_type='charge.refunded',
@@ -111,6 +112,6 @@ class RefundService:
             amount=result.amount_refunded,
             currency=order.currency,
         )
-        fulfillment.deactivate_enrollment(order, event)
+        self.fulfillment.deactivate_enrollment(order, event)
 
         return result
