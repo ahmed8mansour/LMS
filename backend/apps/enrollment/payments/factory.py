@@ -5,9 +5,25 @@ from django.conf import settings
 from .base import PaymentGateway
 from .stripe_gateway import StripeGateway
 
+# simple factory
 
-def get_payment_gateway(name: str = None) -> PaymentGateway:
-    gateway = name or getattr(settings, "PAYMENT_GATEWAY", "stripe")
-    if gateway == "stripe":
-        return StripeGateway()
-    raise ImproperlyConfigured(f"Unknown PAYMENT_GATEWAY: {gateway}")
+GATEWAYS = {
+    "stripe": StripeGateway,
+}
+
+
+def get_payment_gateway(name=None) -> PaymentGateway:
+    gateway_name = name or getattr(
+        settings,
+        "PAYMENT_GATEWAY",
+        "stripe"
+    )
+
+    gateway_class = GATEWAYS.get(gateway_name)
+
+    if not gateway_class:
+        raise ImproperlyConfigured(
+            f"Unknown gateway: {gateway_name}"
+        )
+
+    return gateway_class()

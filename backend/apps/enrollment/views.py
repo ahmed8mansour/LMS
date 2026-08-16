@@ -118,7 +118,7 @@ class GetOrderDetailsView(APIView):
             return _map_payment_exception(e)
 
         if attempt.raw_status == 'succeeded':
-            from .payments import fulfillment
+            from .payments.fulfillment import FulfillmentFacade
             from .payments.dto import PaymentEvent
             event = PaymentEvent(
                 event_id=f"recovery:{order.id}",
@@ -130,7 +130,7 @@ class GetOrderDetailsView(APIView):
                 amount=order.amount,
                 currency=order.currency,
             )
-            fulfillment.activate_enrollment(order, event)
+            FulfillmentFacade().activate_enrollment(order, event)
             return Response({
                 'already_paid': True,
                 'order_id': order.id,

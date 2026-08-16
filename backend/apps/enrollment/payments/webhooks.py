@@ -4,23 +4,25 @@
 import logging
 from django.conf import settings
 
-from . import fulfillment
 from .dto import PaymentEvent
 from .factory import get_payment_gateway
+from .fulfillment import FulfillmentFacade
 
 logger = logging.getLogger(__name__)
 
+_fulfillment = FulfillmentFacade()
+
 
 def _handle_succeeded(order, event: PaymentEvent) -> None:
-    fulfillment.activate_enrollment(order, event)
+    _fulfillment.activate_enrollment(order, event)
 
 
 def _handle_failed(order, event: PaymentEvent) -> None:
-    fulfillment.record_failed_payment(order, event)
+    _fulfillment.record_failed_payment(order, event)
 
 
 def _handle_refunded(order, event: PaymentEvent) -> None:
-    fulfillment.deactivate_enrollment(order, event)
+    _fulfillment.deactivate_enrollment(order, event)
 
 
 _HANDLERS = {
