@@ -20,13 +20,6 @@ _STATUS_MAP = {
 
 
 class StripeGateway(PaymentGateway):
-    """
-    Adapter over Stripe's PaymentIntents API — not the separate Stripe Checkout
-    Session product (see the design-decision table in tasks.md Phase 7: the
-    embedded PaymentElement flow already built is preserved as-is).
-
-    The only module in this codebase allowed to import `stripe`.
-    """
 
     def initiate_payment(self, payment_request: PaymentRequest) -> PaymentAttempt:
         try:
