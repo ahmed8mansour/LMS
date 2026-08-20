@@ -20,6 +20,7 @@ import { useRegisterResendOTP } from "../hooks/useRegisterResendOTP";
 import { useRouter } from "next/navigation";
 import Cookies from "js-cookie";
 import ButtonLoading from "@/components/atoms/buttonloading";
+import { roleHomePath } from "@/lib/cookies";
 
 export function OTPForm() {
     const router = useRouter()
@@ -33,8 +34,9 @@ export function OTPForm() {
     
     const verifyOTP: SubmitHandler<otpFormData> = (data) => {
         if (!!pendingEmail) useVerify({ ...data, email:pendingEmail} , {
-            onSuccess(data, variables, onMutateResult, context) {
-                router.replace('/dashboard/profile/')
+            onSuccess() {
+                // Role-aware first-login landing (backend sets the `role` cookie on verify).
+                router.replace(roleHomePath())
             },
         })
         if(!pendingEmail) router.replace("/register/")

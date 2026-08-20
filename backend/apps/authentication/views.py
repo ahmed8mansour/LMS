@@ -19,7 +19,7 @@ from rest_framework import status
 from .models import CustomUser
 
 from .serializers import   GoogleLoginSerializer,GoogleRegisterSerializer, UserForgetPasswordSetnewoneSerializer ,UserForgetPasswordVerifyOTPSerializer, CustomUserRegisterSendOTPSerializer , UserDataSerializer  , UserLoginSerializer , UserSetPasswordSerializer , UserChangePasswordSerializer , UserRegisterVerifyOTPSerializer , UserResnedOTPSerializer , UserForgetPasswordSendOTPSerializer, GoogleSetPasswordSendOTPSerializer, GoogleSetPasswordVerifyOTPSerializer, GoogleSetPasswordNewPasswordSerializer
-from .utils import set_jwt_cookies, clear_jwt_cookies, CookieJWTAuthentication, set_password_reset_token_cookie, clear_password_reset_token_cookie
+from .utils import set_jwt_cookies, clear_jwt_cookies, CookieJWTAuthentication, set_password_reset_token_cookie, clear_password_reset_token_cookie, set_role_cookie
 # Create your views here.
 import logging
 
@@ -474,17 +474,22 @@ class TokenRefreshCookieView(APIView):
                 {'message': 'Token refreshed successfully'},
                 status=status.HTTP_200_OK
             )
-            
+
             # Set the new access token in cookie
             access_token_lifetime = settings.SIMPLE_JWT.get('ACCESS_TOKEN_LIFETIME', timedelta(minutes=15))
-            
+
             response.set_cookie(
                 key='access_token',
                 value=new_access_token,
                 expires=datetime.now(timezone.utc) + access_token_lifetime,
                 **cookie_settings
             )
-            
+
+            # Keep the non-sensitive routing role cookie alive across rotated sessions
+            user = CustomUser.objects.filter(id=refresh.payload.get('user_id')).first()
+            if user:
+                set_role_cookie(response, user)
+
             return response
             
         except Exception as e:

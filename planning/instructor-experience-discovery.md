@@ -81,11 +81,11 @@ Instructors are **half-built**: the *backend* is materially ready, the *frontend
   toggle and `UserProfile.role` exists, but **nothing in the frontend branches on role** — the route
   guard (`src/proxy.ts`) checks only authenticated-vs-not.
 - **Instructor-facing *read* APIs.** No dashboard summary, per-course analytics, enrolled-student
-  roster, earnings/revenue view, or review-response endpoint. The write side (CRUD) exists; the
+  roster, earnings/revenue view, or instructor reviews feed. The write side (CRUD) exists; the
   insight side does not.
-- **Supporting infrastructure.** No notification system and no background-job runner (Celery/Redis)
-  exist anywhere in the codebase; both are prerequisites for a polished instructor experience
-  (new-enrollment / new-review alerts, async email, heavy analytics).
+- **Supporting infrastructure.** No background-job runner (Celery/Redis) exists anywhere in the
+  codebase; it is a prerequisite only for heavier async work (async email, heavy analytics) as the
+  platform scales — not required by the instructor scope in this document.
 - **Content lifecycle niceties.** No draft/soft-delete/versioning; `is_published` is a single boolean;
   deletes cascade irreversibly.
 
@@ -295,11 +295,11 @@ artifacts students consume, and the instructor dashboard mirrors the student das
 - **Workflow**: eligibility (enrolled + 100%) → submit/edit/delete → aggregates recomputed → instructor reputation reflected.
 - **Pages**: `/dashboard/reviews`; public reviews on `/courses/[id]`.
 - **APIs**: `/reviews/student/reviews`, `/reviews/course/<id>/`, `/reviews/eligibility/<id>/`.
-- **Reusable logic**: `StarRating`, `StarInput`, `RatingComputing`, `get_instructor_rating` (**the review data instructors will want to see and respond to**).
+- **Reusable logic**: `StarRating`, `StarInput`, `RatingComputing`, `get_instructor_rating` (**the review data instructors will want to see**).
 
 **Baseline takeaway**: every student capability has an instructor counterpart — students *consume*
 courses, progress, and reviews; instructors *produce* courses, *watch* progress in aggregate, and
-*respond* to reviews. The instructor experience is the mirror image, built on the same shell.
+*read* their reviews. The instructor experience is the mirror image, built on the same shell.
 
 ---
 
@@ -316,11 +316,11 @@ courses, progress, and reviews; instructors *produce* courses, *watch* progress 
 
 ### 4.2 Daily workflow (established instructor)
 - Land on **dashboard**: at-a-glance totals (courses, students, avg rating, earnings), recent
-  enrollments, recent reviews, and any course "needs attention" (draft, failed video, unanswered review).
+  enrollments, recent reviews, and any course "needs attention" (draft or failed video).
 - Jump to **My Courses** → open a course → **curriculum builder** to add/reorder sections & lectures.
 - **Upload a video** to a new lecture (direct-to-Cloudinary), watch `video_status` progress to COMPLETED.
 - Check **analytics** for a course (enrollments over time, completion rate, quiz pass rate).
-- Review the **students** roster for a course; skim **reviews** and respond.
+- Review the **students** roster for a course; skim **reviews** to understand feedback.
 - Check **earnings** and payout summary.
 
 ### 4.3 Primary goals
@@ -331,12 +331,11 @@ courses, progress, and reviews; instructors *produce* courses, *watch* progress 
 ### 4.4 Secondary goals
 - Maintain a credible **public instructor profile**.
 - Keep content **fresh** (edit, re-order, replace videos, unpublish/republish).
-- Stay **informed** (notifications for new enrollments/reviews).
 
 ### 4.5 Common actions
 Create course · edit course metadata · add/reorder section · add/reorder/delete lecture · upload/replace
 video · build a quiz (questions + choices, mark correct) · publish/unpublish · view analytics · view
-students · read/respond to reviews · view earnings · edit profile.
+students · read reviews · view earnings · edit profile.
 
 ### 4.6 Edge cases
 - **Publishing an incomplete course** (no sections/lectures, or a lecture whose `video_status ≠ COMPLETED`) → block with clear guidance.
@@ -386,10 +385,8 @@ project's Spec-Kit stories (Given/When/Then).
 - **US-10 (Profile)**: *…maintain a public instructor profile (title, about, avatar) so students trust me.*
 
 ### 5.3 Growth stories (engagement & earnings) — P3
-- **US-11 (Reviews)**: *…read reviews on my courses and respond to them so I can engage students and
-  address feedback.*
+- **US-11 (Reviews, read-only)**: *…read the reviews on my courses so I can understand student feedback.*
 - **US-12 (Earnings)**: *…see revenue by course and over time, and refunds, so I can track income.*
-- **US-13 (Notifications)**: *…be notified of new enrollments and new reviews so I can respond promptly.*
 
 ### 5.4 Administrative stories
 - **US-14 (Admin oversight)**: *As an admin, I want to manage any instructor's courses and remove
@@ -422,9 +419,8 @@ project's Spec-Kit stories (Given/When/Then).
 | C6 | **Course Analytics** | Enrollments/completion/quiz insight | Helps instructors improve → better outcomes | Enrollment, progress data | P2 | H | `Enrollment`, `LectureProgress`, `QuizAttempt` | Analytics aggregation read APIs + charts |
 | C7 | **Student Management** | Roster + progress per course | Instructor support & transparency | Enrollment, progress | P2 | M | `Enrollment`, progress utils | Roster read API + page |
 | C8 | **Instructor Profile** | Public identity management | Trust → conversion | `InstructorProfile`, profile update | P2 | S | Profile update path, `InstructorProfile` | Instructor profile edit page |
-| C9 | **Reviews & Responses** | Read + respond to course reviews | Engagement, reputation repair | `Review`, ratings | P3 | M | `Review`, `get_instructor_rating`, `StarRating` | `ReviewResponse` model + endpoints + UI |
+| C9 | **Reviews (read-only)** | Read course reviews | Engagement, understand feedback | `Review`, ratings | P3 | S | `Review`, `get_instructor_rating`, `StarRating` | Instructor reviews feed read API + UI |
 | C10 | **Earnings & Payouts** | Revenue/refund visibility | Instructor motivation/retention | Orders/Transactions | P3 | M | `Order`, `Transaction`, `FulfillmentFacade` | Earnings read API + page |
-| C11 | **Notifications** | Alert on enrollment/review | Timeliness, re-engagement | net-new infra | P3 | H | `EmailService` (senders) | `Notification` model + API + (ideally) jobs |
 
 Complexity: S = small, M = medium, H = high.
 
@@ -455,11 +451,9 @@ Per-course + aggregate.
 
 **C8 · Instructor Profile** — Edit title/about/avatar · Preview public profile.
 
-**C9 · Reviews** — List reviews per course · Respond to review · Edit/delete response · Rating summary.
+**C9 · Reviews (read-only)** — List reviews per course · List reviews across courses · Rating summary.
 
 **C10 · Earnings** — Total/period revenue · Revenue by course · Refunds · Transaction list.
-
-**C11 · Notifications** — New-enrollment alert · New-review alert · Read/unread · Notification center.
 
 ---
 
@@ -486,7 +480,6 @@ Authenticated user
 ├── Analytics            /instructor/analytics
 ├── Reviews              /instructor/reviews
 ├── Earnings             /instructor/earnings
-├── Notifications        /instructor/notifications
 └── Settings
     ├── Profile          /instructor/settings/profile
     └── Instructor Bio   /instructor/settings/instructor-profile
@@ -504,12 +497,11 @@ Authenticated user
 │       ├── /quizzes/[quizId]                 Quiz editor (questions/choices)
 │       ├── /analytics                        Per-course analytics
 │       ├── /students                         Per-course roster
-│       └── /reviews                          Per-course reviews + responses
+│       └── /reviews                          Per-course reviews (read-only)
 ├── /students                                 All students (across courses)
 ├── /analytics                                Aggregate analytics
-├── /reviews                                  All reviews (respond)
+├── /reviews                                  All reviews (read-only)
 ├── /earnings                                 Earnings & payouts
-├── /notifications                            Notification center
 └── /settings
     ├── /profile                              Account profile (shared path/pattern)
     └── /instructor-profile                   Public instructor bio (title/about/avatar)
@@ -549,12 +541,11 @@ quick actions (Create course · Upload video). New-instructor variant collapses 
 | Quiz Editor | `.../quizzes/[quizId]` | Author quiz | Question/choice editor, *StarInput* n/a | instructor quiz/question/choice endpoints | Add/edit questions, mark correct | *skeleton* | "No questions yet" | Field errors |
 | Course Analytics | `/instructor/courses/[id]/analytics` | Per-course insight | Charts (line/bar), stat tiles | **[NEW]** `/courses/instructor/courses/{id}/analytics/` | Change period | *skeleton* | "No data yet" | Retry |
 | Course Students | `/instructor/courses/[id]/students` | Roster + progress | Table, progress bars | **[NEW]** `/courses/instructor/courses/{id}/students/` | Search/sort | *skeleton* | "No students yet" | Retry |
-| Course Reviews | `/instructor/courses/[id]/reviews` | Reviews + respond | *StarRating*, review list, response box | `/reviews/course/{id}/`, **[NEW]** response endpoint | Respond/edit | *skeleton* | "No reviews yet" | Retry |
+| Course Reviews | `/instructor/courses/[id]/reviews` | Read course reviews | *StarRating*, review list | `/reviews/course/{id}/` | Filter/sort | *skeleton* | "No reviews yet" | Retry |
 | All Students | `/instructor/students` | Cross-course roster | Table, filters | **[NEW]** roster (aggregate) | Search/filter | *skeleton* | Empty | Retry |
 | Aggregate Analytics | `/instructor/analytics` | All-course insight | Charts | **[NEW]** aggregate analytics | Period | *skeleton* | Empty | Retry |
-| All Reviews | `/instructor/reviews` | Respond across courses | Review list | **[NEW]** instructor reviews feed | Respond | *skeleton* | Empty | Retry |
+| All Reviews | `/instructor/reviews` | Read reviews across courses | Review list | **[NEW]** instructor reviews feed | Filter/sort | *skeleton* | Empty | Retry |
 | Earnings | `/instructor/earnings` | Revenue/refunds | Stat tiles, table, chart | **[NEW]** `/enrollment/instructor/earnings/` | Period, export (later) | *skeleton* | "No earnings yet" | Retry |
-| Notifications | `/instructor/notifications` | Alerts | List, read/unread | **[NEW]** `/…/notifications/` | Mark read | *skeleton* | "You're all caught up" | Retry |
 | Instructor Profile | `/instructor/settings/instructor-profile` | Public bio | Form, avatar | profile update path, `InstructorProfile` | Save | *skeleton* | — | Field errors |
 
 ---
@@ -620,21 +611,13 @@ There is **no assignment or Q&A subsystem** today (only auto-scored quizzes). In
 quizzes; scoring is automatic (`QuizAttempt`, 50% threshold). This document does **not** invent an
 assignment-grading or Q&A feature (out of scope; noted as a future capability in §16/§17).
 
-### 10.9 Respond to Reviews
+### 10.9 Read Reviews
 ```
-/instructor/reviews (or per-course) → list Review rows for owned courses
-  → POST [NEW] review-response {review_id, body}  → response shown under the review (public)
-  → edit/delete own response
-```
-
-### 10.10 Handle Notifications
-```
-Enrollment activated / Review created → [NEW] Notification row for the course's instructor
-  → /instructor/notifications lists unread-first → mark read
-  → (optional) async email via existing EmailService sender — requires a job runner for scale (§15)
+/instructor/reviews (or per-course) → GET [NEW] instructor reviews feed / existing /reviews/course/{id}/
+  → list Review rows for owned courses (read-only) → filter/sort → view rating summary
 ```
 
-### 10.11 View Earnings
+### 10.10 View Earnings
 ```
 /instructor/earnings → GET [NEW] earnings endpoint
   → sum paid Order.amount for the instructor's courses, minus refunds; group by course + period
@@ -660,7 +643,7 @@ Enrollment activated / Review created → [NEW] Notification row for the course'
 | Upload/replace video | Only lectures in **own** courses (`_get_owned_lecture`) |
 | Publish/unpublish | **Own** courses |
 | View analytics / students / earnings | **Own** courses only |
-| Respond to reviews | Reviews on **own** courses |
+| Read reviews | Reviews on **own** courses (read-only) |
 | Edit instructor profile | **Own** `InstructorProfile` |
 | View another instructor's private data | **Never** (server-enforced) |
 
@@ -703,7 +686,6 @@ filter** — never trust a course/lecture ID from the client without confirming 
 |-------|-----------|
 | `proxy.ts` route guard | Add **role awareness**: gate `/instructor/*`, redirect by role. (Requires role available at the edge — see §15 note on reading role without decoding the JWT client-side.) |
 | `SideBar.tsx` | Currently hardcoded student nav; create a **sibling** `InstructorSidebar` (not a branch) with the instructor nav set. |
-| `EmailService` / senders | Add new senders for enrollment/review notifications (reusing the Strategy pattern). |
 | `CourseSerializer` | Possibly add instructor-only fields (readiness flags, draft counts) via a dedicated instructor serializer variant — do not change the student-facing shape. |
 | Enrollment/payment reads | Add an **instructor earnings** read that aggregates existing `Order`/`Transaction` — no changes to payment writes. |
 
@@ -716,12 +698,10 @@ filter** — never trust a course/lecture ID from the client without confirming 
 ### 12.4 Must be rebuilt (net-new)
 | Area | Why nothing exists to reuse |
 |------|----------------------------|
-| Instructor **read/insight** APIs (dashboard summary, analytics, roster, earnings) | Only student/admin reads exist; instructor reads are absent. |
+| Instructor **read/insight** APIs (dashboard summary, analytics, roster, earnings, reviews feed) | Only student/admin reads exist; instructor reads are absent. |
 | Instructor **frontend** (routes, layouts, pages, feature modules, hooks) | Zero instructor UI today. |
-| **Review responses** (`ReviewResponse`) | No response concept in the `Review` model. |
-| **Notifications** (model + API + delivery) | No notification system anywhere. |
 | **Publish-readiness validation** | `is_published` is a bare boolean with no gating logic. |
-| **Background jobs** (if async notifications/analytics needed) | No Celery/Redis; all email is synchronous. |
+| **Background jobs** (only if async analytics/email needed later) | No Celery/Redis; all email is synchronous. |
 
 ---
 
@@ -733,9 +713,10 @@ filter** — never trust a course/lecture ID from the client without confirming 
 ### 13.1 New models
 | Model | App | Purpose | Shape (conceptual) |
 |-------|-----|---------|--------------------|
-| `ReviewResponse` | `reviews` | Instructor reply to a review | FK → `Review` (1:1), FK author → `InstructorProfile`, `body`, timestamps |
-| `Notification` | new `notifications` app (or `authentication`) | In-app alerts | FK → recipient `CustomUser`, `type` (enrollment/review), `payload`/`message`, `is_read`, `created_at` |
 | *(optional)* course lifecycle fields | `course` | Archive/soft-delete | add `is_archived` / `deleted_at` (migration-only; never modify existing migrations — add new) |
+
+*No new models are required for the instructor scope — reviews are read-only (reuse the existing
+`Review` model) and there is no notification system.*
 
 ### 13.2 New APIs (read-focused, instructor-scoped)
 | Endpoint | Method | Returns |
@@ -745,13 +726,11 @@ filter** — never trust a course/lecture ID from the client without confirming 
 | `/courses/instructor/analytics/` | GET | aggregate across owned courses |
 | `/courses/instructor/courses/{id}/students/` | GET | roster: student, enrolled_at, progress % (paginated) |
 | `/courses/instructor/courses/{id}/publish/` (or PATCH existing) | POST/PATCH | publish/unpublish with readiness validation |
-| `/reviews/instructor/reviews/` | GET | reviews across owned courses |
-| `/reviews/instructor/reviews/{id}/response/` | POST/PATCH/DELETE | create/edit/delete a response |
+| `/reviews/instructor/reviews/` | GET | reviews across owned courses (read-only) |
 | `/enrollment/instructor/earnings/` | GET | revenue by course + period, refunds, transactions |
-| `/notifications/` | GET / PATCH | list + mark-read |
 
 ### 13.3 New serializers
-Instructor dashboard/analytics/earnings/roster serializers; `ReviewResponseSerializer`; a possible
+Instructor dashboard/analytics/earnings/roster/reviews serializers; a possible
 `InstructorCourseSerializer` variant exposing readiness/draft fields (keep student serializer untouched).
 
 ### 13.4 New services
@@ -759,7 +738,6 @@ Instructor dashboard/analytics/earnings/roster serializers; `ReviewResponseSeria
   `QuizAttempt` (keep views thin; mirror the existing service-layer style).
 - **`InstructorEarningsService`** — aggregate `Order`/`Transaction` (paid − refunded) per course/period.
 - **`PublishReadinessService`** — validate a course is publishable.
-- Extend **`EmailService`** with enrollment/review notification senders.
 
 ### 13.5 New permissions
 Reuse `isInstructor`. Introduce a small reusable **ownership mixin** (`get_queryset` filter helper) so
@@ -767,19 +745,14 @@ every new read view enforces `instructor == request.user.instructor_profile` con
 today's ad-hoc per-view checks.
 
 ### 13.6 Database changes
-Additive migrations only (per Hard Rules): `ReviewResponse`, `Notification`, optional
-`is_archived`/`deleted_at`. **No modification of existing migrations.** Add indexes for analytics-heavy
-queries (`Enrollment(course, created_at)`, `LectureProgress(lecture, is_completed)`).
+Additive migrations only (per Hard Rules): optional `is_archived`/`deleted_at`. **No modification of
+existing migrations.** Add indexes for analytics-heavy queries (`Enrollment(course, created_at)`,
+`LectureProgress(lecture, is_completed)`).
 
 ### 13.7 Background jobs
-None exist. For P1–P2, analytics/earnings can be computed **synchronously on read** (acceptable at
-current scale). For P3 notifications and async email at scale, introduce a job runner (Celery/RQ +
-Redis) — called out as a dependency/risk, not a P1 requirement.
-
-### 13.8 Notifications
-New `Notification` model + list/mark-read API; write triggers on enrollment activation (hook into
-`FulfillmentFacade`) and review creation (hook into the reviews create path). In-app first; email
-delivery reuses `EmailService`.
+None exist. For P1–P3, analytics/earnings can be computed **synchronously on read** (acceptable at
+current scale). A job runner (Celery/RQ + Redis) is only a future consideration for async email at
+scale — it is **not** required by any instructor spec in this document.
 
 ---
 
@@ -788,7 +761,7 @@ delivery reuses `EmailService`.
 ### 14.1 New pages
 All pages in §9 under `app/(instructor)/…`: dashboard, courses (list/new/workspace with
 overview·curriculum·lecture editor·quiz editor·analytics·students·reviews tabs), aggregate students /
-analytics / reviews, earnings, notifications, instructor profile.
+analytics / reviews, earnings, instructor profile.
 
 ### 14.2 New layouts
 - `app/(instructor)/layout.tsx` — `InstructorSidebar` + scrollable `<main>` (mirrors
@@ -801,30 +774,27 @@ featuers/instructor-courses/     api · hooks · components · schemas (*.schma.
 featuers/instructor-curriculum/  (sections/lectures/quizzes authoring + video upload)
 featuers/instructor-analytics/
 featuers/instructor-students/
-featuers/instructor-reviews/
+featuers/instructor-reviews/          (read-only)
 featuers/instructor-earnings/
 featuers/instructor-dashboard/
-featuers/notifications/
 ```
 
 ### 14.4 New hooks (TanStack Query)
 Queries: `useInstructorDashboard`, `useInstructorCourses`, `useInstructorCourse`, `useCourseAnalytics`,
-`useCourseStudents`, `useInstructorEarnings`, `useInstructorReviews`, `useNotifications`.
+`useCourseStudents`, `useInstructorEarnings`, `useInstructorReviews`.
 Mutations: `useCreateCourse`, `useUpdateCourse`, `usePublishCourse`, `useCreateSection`,
-`useReorderSections`, `useCreateLecture`, `useUploadLectureVideo`, `useCreateQuiz`,
-`useRespondToReview`, `useMarkNotificationRead`.
+`useReorderSections`, `useCreateLecture`, `useUploadLectureVideo`, `useCreateQuiz`.
 
 ### 14.5 New queries/mutations (API clients)
 `instructorCoursesAPI`, `instructorCurriculumAPI`, `instructorAnalyticsAPI`, `instructorStudentsAPI`,
-`instructorEarningsAPI`, `instructorReviewsAPI`, `notificationsAPI` — each a namespaced axios object,
+`instructorEarningsAPI`, `instructorReviewsAPI` — each a namespaced axios object,
 reusing the shared `axios` instance (`src/lib/axios.ts`) and error handling.
 
 ### 14.6 New contexts / state
 - Prefer **TanStack Query as the source of truth** (as the student side already does) — avoid a bespoke
   auth context.
 - New Zustand slices only where UI state is genuinely local: `instructorCurriculum.store.ts` (builder
-  open/reorder state), `videoUpload.store.ts` (upload progress/status), possibly `notifications.store.ts`
-  (unread badge).
+  open/reorder state), `videoUpload.store.ts` (upload progress/status).
 
 ### 14.7 Shared components (new, reusable)
 Data table (roster/earnings/reviews), chart primitives (line/bar for analytics — follow the project's
@@ -880,14 +850,14 @@ Redux (installed but unused — do not introduce).
 - **Ownership must be enforced on every new read endpoint** — the biggest risk is an instructor reading
   another instructor's students/earnings/analytics by ID. Standardize the ownership filter (mixin).
 - **Draft leakage**: ensure draft courses never appear in any student/public serializer path.
-- **Notification/earnings data** is sensitive; never expose another instructor's aggregates.
+- **Earnings data** is sensitive; never expose another instructor's aggregates.
 - Keep the `role` routing cookie **non-sensitive** (role only, not a token); never move the JWT out of
   HttpOnly.
 
 ### 15.5 Future scalability
-- **No background-job runner** limits async notifications, scheduled analytics, and large email fan-out;
-  introducing Celery/RQ + Redis is the main infra investment for P3.
-- **No real-time layer** (WebSockets) — live notifications/progress would need new infra.
+- **No background-job runner** limits scheduled analytics and large email fan-out; introducing Celery/RQ
+  + Redis is a future infra investment, not required by any instructor spec in this document.
+- **No real-time layer** (WebSockets) — any future live-update features would need new infra.
 - **No soft-delete/versioning** — deleting content is irreversible and risky at scale; a soft-delete
   model is a sensible pre-scale addition.
 
@@ -918,10 +888,10 @@ Phases are ordered so each delivers an independently valuable, closely-related s
 
 ### Phase 3 — Engagement & Earnings (P3)
 **Goal**: close the loop on reputation and revenue.
-- **Reviews & responses** (`ReviewResponse` model + endpoints + UI).
+- **Reviews (read-only)** — instructor reviews feed API + UI to read and understand student feedback.
 - **Earnings** (`InstructorEarningsService`) + page.
-- **Notifications** (model + API + in-app center; async email + job runner as the infra dependency).
-**Outcome**: instructors are motivated, informed, and responsive.
+**Outcome**: instructors understand their reputation and track their revenue. No new infrastructure
+required — both are read-only additions.
 
 ### Phase 4 — Hardening & scale (post-MVP, optional)
 Soft-delete/versioning, caching/denormalized analytics, background jobs, batch operations
@@ -946,15 +916,14 @@ Each spec is independently implementable and mirrors the existing `specs/feature
 | 7 | **009-instructor-analytics** | Course + aggregate analytics | `InstructorAnalyticsService`, analytics APIs + charts | 004, 008 | L |
 | 8 | **010-instructor-students** | Roster + progress | roster APIs + pages | 004 | M |
 | 9 | **011-instructor-profile** | Public bio editing | instructor profile page on existing profile path | 003 | S |
-| 10 | **012-instructor-reviews-responses** | Read + respond to reviews | `ReviewResponse` model + endpoints + UI | reviews app | M |
+| 10 | **012-instructor-reviews** | Read course reviews | Instructor reviews feed read API + UI (read-only) | reviews app | S |
 | 11 | **013-instructor-earnings** | Revenue/refund visibility | `InstructorEarningsService` + earnings API + page | enrollment app | M |
-| 12 | **014-notifications** | In-app alerts (+ async email) | `Notification` model + API + center; job runner as dependency | enrollment/reviews hooks | L |
 
 > **Sequencing rationale**: 003 unlocks everything; 004–007 are the authoring MVP (Phase 1) and should
-> ship together; 008–011 are the insight layer (Phase 2); 012–014 are engagement/earnings (Phase 3),
-> with 014 carrying the only significant new infrastructure (a background-job runner). Every spec
-> reuses the existing service-layer, component library, and feature-module conventions, and adds only a
-> thin, ownership-scoped backend surface where insight data is genuinely missing.
+> ship together; 008–011 are the insight layer (Phase 2); 012–013 are engagement/earnings (Phase 3),
+> both read-only additions that need no new infrastructure. Every spec reuses the existing service-layer,
+> component library, and feature-module conventions, and adds only a thin, ownership-scoped backend
+> surface where insight data is genuinely missing.
 
 ---
 

@@ -1,6 +1,29 @@
 import Cookies from 'js-cookie';
 
 
+/**
+ * The non-sensitive routing role carried by the `role` cookie (set by the backend).
+ * Used for role-aware redirects and shell decisions only — never as an authorization
+ * check. The backend permission classes remain the real gate.
+ */
+export type RoutingRole = "student" | "instructor" | "admin";
+
+/**
+ * Read the routing role from the readable `role` cookie. Unknown/missing values
+ * resolve to "student" (least-privilege default).
+ */
+export const readRoutingRole = (): RoutingRole => {
+    const value = Cookies.get('role');
+    return value === "instructor" || value === "admin" ? value : "student";
+};
+
+/** The path an authenticated user should land on for their routing role. */
+export const roleHomePath = (role: RoutingRole = readRoutingRole()): string => {
+    if (role === "instructor") return "/instructor";
+    if (role === "admin") return "/admin-unavailable";
+    return "/dashboard";
+};
+
 
 export const getCookies =  (TOKEN_KEY:string) =>  Cookies.get(TOKEN_KEY)
 

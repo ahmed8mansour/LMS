@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import { useLogin } from "../hooks/useLogin";
 import ButtonLoading from "@/components/atoms/buttonloading";
 import Link from "next/link";
+import { roleHomePath } from "@/lib/cookies";
 
 
 export function LoginForm() {
@@ -23,8 +24,9 @@ export function LoginForm() {
     
     const onSubmit: SubmitHandler<LoginFormData> = (data) => {
         userLogin(data , {
-            onSuccess(data) {
-                router.replace("/")
+            onSuccess() {
+                // Role-aware landing: the backend sets a readable `role` cookie on login.
+                router.replace(roleHomePath())
             },
             onError(error) {
                 const message = error.response?.data?.error?.join('\n');
