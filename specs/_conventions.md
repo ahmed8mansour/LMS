@@ -843,3 +843,25 @@ const { data, fetchNextPage, hasNextPage } = useInfiniteQuery({
 4. **Error Handling**:
    - Backend: Return `{error: message}` with appropriate status codes
    - Frontend: Use `handleAuthError()` from toast utilities
+
+---
+
+## Role-Aware Routing & the Instructor Shell (spec 003)
+
+Patterns introduced by `003-instructor-foundation` that later instructor specs (004–013) build on:
+
+- **Routing role cookie**: on every authenticated response the backend `set_jwt_cookies()`
+  (`backend/apps/authentication/utils.py`) also sets a **non-HttpOnly, non-sensitive** `role` cookie
+  (`admin` if `is_superuser`, else `instructor` if `role == 'instructor'`, else `student`) via
+  `set_role_cookie()`. `clear_jwt_cookies()` deletes it. The JWT stays HttpOnly; the `role` cookie is a
+  UI hint only — **backend permissions remain the real gate**.
+- **Client helpers**: `readRoutingRole()` and `roleHomePath()` in `front-end/src/lib/cookies.ts`.
+  Use these for role-aware redirects; never as an authorization check.
+- **Edge guard**: `front-end/src/proxy.ts` enforces the three-way branch (student / instructor / admin),
+  allow-listing `/dashboard/learn` for instructors. See
+  `specs/003-instructor-foundation/contracts/routing-contract.md`.
+- **Instructor shell**: lives at `front-end/src/app/instructor/` (real segment, own `layout.tsx` +
+  `components/organisms/InstructorSidebar.tsx`) — a sibling of the student `SideBar.tsx`, not a role
+  branch. New instructor pages go under `app/instructor/<section>/page.tsx`.
+- **Placeholders**: `components/molecules/ComingSoon.tsx` is the shared empty-state for not-yet-built
+  instructor destinations. Replace a section's `ComingSoon` with its real UI when that spec lands.

@@ -4,6 +4,7 @@ import { Button } from "@/components/atoms/button"
 import { useGoogleLogin } from '@react-oauth/google';
 import { useGoogleLogin2 } from "../hooks/useGoogleLogin";
 import { useRouter } from "next/navigation";
+import { roleHomePath } from "@/lib/cookies";
 
 export function GoogleLoginButton() {
         const router = useRouter()
@@ -16,8 +17,8 @@ export function GoogleLoginButton() {
             authenticateWithGoogle({
                 code: codeResponse.code,
             } , {
-                onSuccess(data) {
-                    router.replace("/")
+                onSuccess() {
+                    router.replace(roleHomePath())
                 },
             });
         },

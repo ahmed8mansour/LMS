@@ -107,14 +107,51 @@ class CookieJWTAuthentication(JWTAuthentication):
 # ==============================
 
 
+def compute_routing_role(user):
+    """
+    Compute the non-sensitive routing role used by the frontend to decide which
+    shell to render. Admins are identified by ``is_superuser`` (checked first),
+    then role-instructors, otherwise everyone else is treated as a student.
+
+    This is a UI hint only — the backend permission classes remain the real gate.
+    """
+    if getattr(user, 'is_superuser', False):
+        return 'admin'
+    if getattr(user, 'role', None) == 'instructor':
+        return 'instructor'
+    return 'student'
+
+
+def set_role_cookie(response, user):
+    """
+    Set a readable (non-HttpOnly), non-sensitive ``role`` cookie carrying the
+    routing role. Read at the edge by ``proxy.ts`` and client-side for role-aware
+    redirects. Lifetime is aligned to the refresh token so it survives access-token
+    refreshes. Never contains tokens or PII — a role label only.
+    """
+    cookie_settings = settings.JWT_COOKIE_SETTINGS
+    refresh_token_lifetime = settings.SIMPLE_JWT.get('REFRESH_TOKEN_LIFETIME', timedelta(days=7))
+
+    response.set_cookie(
+        key='role',
+        value=compute_routing_role(user),
+        expires=datetime.now(timezone.utc) + refresh_token_lifetime,
+        secure=cookie_settings.get('secure', False),
+        samesite=cookie_settings.get('samesite', 'Lax'),
+        path=cookie_settings.get('path', '/'),
+        httponly=False,  # MUST be readable by edge middleware + client
+    )
+    return response
+
+
 def set_jwt_cookies(response, user):
     """
     Set access and refresh tokens as HttpOnly cookies in the response.
-    
+
     Args:
         response: The HTTP response object
         user: The authenticated user object
-    
+
     Returns:
         The response with cookies set
     """
@@ -122,11 +159,11 @@ def set_jwt_cookies(response, user):
     refresh = RefreshToken.for_user(user)
     access_token = str(refresh.access_token)
     refresh_token = str(refresh)
-    
+
     # Calculate cookie expiration times
     access_token_lifetime = settings.SIMPLE_JWT.get('ACCESS_TOKEN_LIFETIME', timedelta(minutes=15))
     refresh_token_lifetime = settings.SIMPLE_JWT.get('REFRESH_TOKEN_LIFETIME', timedelta(days=7))
-    
+
     # Set access token cookie
     response.set_cookie(
         key='access_token',
@@ -134,7 +171,7 @@ def set_jwt_cookies(response, user):
         expires=datetime.now(timezone.utc) + access_token_lifetime,
         **cookie_settings
     )
-    
+
     # Set refresh token cookie
     response.set_cookie(
         key='refresh_token',
@@ -143,7 +180,10 @@ def set_jwt_cookies(response, user):
         **cookie_settings
 
     )
-    
+
+    # Set the non-sensitive routing role cookie (readable at the edge)
+    set_role_cookie(response, user)
+
     return response
 
 
@@ -190,6 +230,11 @@ def clear_jwt_cookies(response):
     )
     response.delete_cookie(
         key='refresh_token',
+        path='/',
+        samesite='Lax',
+    )
+    response.delete_cookie(
+        key='role',
         path='/',
         samesite='Lax',
     )
