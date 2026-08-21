@@ -103,3 +103,43 @@ class CourseSerializer(serializers.ModelSerializer):
 
 
 
+class InstructorCourseSerializer(serializers.ModelSerializer):
+    instructor_profile = serializers.SerializerMethodField()
+    sections = serializers.SerializerMethodField()
+
+
+    class Meta:
+        model = Course
+        fields = [
+            'id', 'title', 'description', 'thumbnail',
+            'category', 'level', 'price', 'rating',
+            'subscribers_count', 'reviews_count', 'is_published','language',
+            'last_updated', 'goals_list',
+            'instructor_profile', 'sections',   
+            
+        ]
+        read_only_fields = ['rating' , 'subscribers_count', 'is_published' , 'reviews_count']
+        
+
+    def get_instructor_profile(self , obj):
+        try :
+            instructor = obj.instructor.user
+            profile_data = UserDataSerializer(instructor).data
+
+            from apps.reviews.utils import get_instructor_rating
+            rating_data = get_instructor_rating(obj.instructor)
+            profile_data['avg_rating'] = rating_data['avg_rating']
+            profile_data['reviews_count'] = rating_data['reviews_count']
+
+            return profile_data
+        except CustomUser.DoesNotExist:
+            return None
+    def get_sections(self, obj):
+        sections = Section.objects.filter(course=obj)  
+        if not sections.exists():
+            return []
+        return SectionSerializer(sections, many=True, context = self.context).data
+
+    def to_representation(self, instance):
+        return super().to_representation(instance)
+
