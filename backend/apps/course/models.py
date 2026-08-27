@@ -9,7 +9,7 @@ import secrets
 
 
 class Course(models.Model):
-    thumbnail = models.ImageField(upload_to='LMS/courses/thumbnail')
+    thumbnail = models.URLField(max_length=500, null=True, blank=True)
     title = models.CharField(max_length=255)
     description = models.CharField(max_length=255)
     price = models.DecimalField(decimal_places=2 , max_digits=6)

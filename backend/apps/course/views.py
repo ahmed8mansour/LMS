@@ -15,7 +15,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework import status
 
 from django.conf import settings
-from .serializers import CourseSerializer , SectionSerializer , QuizSerializer , LectureSerializer
+from .serializers import CourseSerializer , SectionSerializer , QuizSerializer , LectureSerializer , InstructorCourseSerializer
 from .models import Course , Section , Quiz , Lecture
 
 from rest_framework.viewsets import ModelViewSet , ReadOnlyModelViewSet
@@ -67,7 +67,7 @@ class AdminLectureViewSet(ModelViewSet):
 
 
 class InstructorCourseViewSet(ModelViewSet):
-    serializer_class = CourseSerializer
+    serializer_class = InstructorCourseSerializer
     authentication_classes = [CookieJWTAuthentication]
     permission_classes = [IsAuthenticated , isInstructor]
 
@@ -80,10 +80,18 @@ class InstructorCourseViewSet(ModelViewSet):
         except InstructorProfile.DoesNotExist:
             return Course.objects.none()
     
-    # نربط الكورس مع الانستراكتور الاصلي 
+    # نربط الكورس مع الانستراكتور الاصلي
+    # الحقول اللي بيديرها السيرفر (read-only) لازم ندي لها قيم افتراضية عند الإنشاء
+    # لأن الموديل مفيهاش default → من غير كده الـ create هيكسر بـ IntegrityError
     def perform_create(self, serializer):
         try:
-            serializer.save(instructor=self.request.user.instructor_profile)
+            serializer.save(
+                instructor=self.request.user.instructor_profile,
+                rating=0,
+                subscribers_count=0,
+                reviews_count=0,
+                is_published=False,
+            )
         except InstructorProfile.DoesNotExist:
             raise ValidationError("There is no Instructor Profile for this user ")
 

@@ -1,7 +1,7 @@
 import axiosInstance from '@/lib/axios';
 import { RegisterFormData  , UserProfileFormData } from '../schemas/auth.schma';
 import {  UserChangePasswordRequest , UserChangePasswordResponse ,   ForgetPasswordResetRequest , ForgetPasswordResetResponse , RefreshAccessTokenResponse , RegisterVerifyOTP , RegisterResendOTP , LoginBody, GoogleLoginRequest , ForgetPasswordSendOTPResponse , ForgetPasswordVerifyOTPResponse , GoogleRegisterRequest, GoogleAuthResponse, UserProfile, GoogleSetPasswordVerifyOTPRequest, GoogleSetPasswordResetRequest } from "../types/auth.types";
-import axios from 'axios';
+import uploadToCloudinary from '@/lib/cloudinary';
 // post(url , body , config)
 async function userRegister(requestBody: RegisterFormData){
     const {data} = await axiosInstance.post("/auth/user/register/sendOTP/",requestBody) 
@@ -29,26 +29,6 @@ async function userLogout(){
     const {data} = await axiosInstance.post("/auth/user/logout/") 
     return data
 }
-
-
-async function uploadToCloudinary(file: File): Promise<string> {
-    const { data: sigData } = await axiosInstance.get('/auth/user/getCloudinarySignature/');
-    
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('api_key', sigData.api_key);
-    formData.append('timestamp', sigData.timestamp);
-    formData.append('signature', sigData.signature);
-    
-    const { data } = await axios.post(
-        `https://api.cloudinary.com/v1_1/${sigData.cloud_name}/image/upload`,
-        formData,
-        { timeout: 60000 }
-    );
-    
-    return data.secure_url; 
-}
-
 
 // the cookies will be sent [axiosInstance interceptores]
 async function updateUserProfile(requestBody : UserProfileFormData): Promise<UserProfile> {
