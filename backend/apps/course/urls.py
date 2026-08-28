@@ -1,6 +1,7 @@
 from django.urls import path, include
 from .views import  AdminCourseViewSet , AdminLectureViewSet , AdminSectionViewSet , AdminQuizViewSet
 from .views import InstructorCourseViewSet , InstructorLectureViewSet , InstructorSectionViewSet , InstructorQuizViewSet
+from .views import InstructorQuestionViewSet , InstructorChoiceViewSet
 from .views import StudentCourseViewSet , StudentSectionViewSet , StudentLectureViewSet , StudentQuizViewSet , StudentCourseView
 from .views import VideoUploadSignatureView, VideoWebhookView
 from rest_framework.routers import DefaultRouter
@@ -17,7 +18,9 @@ router.register('admin/quizzes' , AdminQuizViewSet , basename='admin_quizzes')
 router.register('instructor/courses' , InstructorCourseViewSet , basename='instructor_courses') 
 router.register('instructor/sections' , InstructorSectionViewSet , basename='instructor_sections') 
 router.register('instructor/lectures' , InstructorLectureViewSet , basename='instructor_lectures') 
-router.register('instructor/quizzes' , InstructorQuizViewSet , basename='instructor_quizzes') 
+router.register('instructor/quizzes' , InstructorQuizViewSet , basename='instructor_quizzes')
+router.register('instructor/questions' , InstructorQuestionViewSet , basename='instructor_questions')
+router.register('instructor/choices' , InstructorChoiceViewSet , basename='instructor_choices')
 
 
 
