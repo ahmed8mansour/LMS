@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Course , Section ,Lecture , Quiz
+from .models import Course , Section ,Lecture , Quiz , Question , Choice
 from apps.authentication.models import CustomUser
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -43,7 +43,45 @@ class QuizSerializer(serializers.ModelSerializer):
         model = Quiz
         fields='__all__'
         # exclude = ['section']
-    
+
+
+class ChoiceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Choice
+        fields = ['id', 'question', 'text', 'is_correct']
+        # A new choice defaults to incorrect; exactly-one-correct is enforced
+        # server-side in the viewset when is_correct is set true.
+        extra_kwargs = {'is_correct': {'required': False, 'default': False}}
+
+
+class QuestionSerializer(serializers.ModelSerializer):
+    # Choices are read nested so the quiz editor loads a question with its
+    # answers in one call; writes to choices go through the choices endpoint.
+    choices = ChoiceSerializer(many=True, read_only=True, source='choice')
+
+    class Meta:
+        model = Question
+        fields = ['id', 'quiz', 'text', 'order', 'choices']
+        # order is server-assigned/reordered; text may be blank mid-edit.
+        extra_kwargs = {
+            'order': {'required': False},
+            'text': {'required': False, 'allow_blank': True},
+        }
+
+
+class InstructorQuizSerializer(serializers.ModelSerializer):
+    # questions_count is server-managed (recomputed on question add/delete) and
+    # read-only to instructors — never client-set (FR-009a). Kept separate from
+    # the shared QuizSerializer so the admin/nested-read shapes are untouched.
+    class Meta:
+        model = Quiz
+        fields = ['id', 'section', 'title', 'questions_count']
+        read_only_fields = ['questions_count']
+        # Drop the auto OneToOne uniqueness validator (both the serializer-level
+        # and the field-level one on `section`) so a duplicate quiz is reported
+        # as a clean {"error": ...} by the viewset instead of a field-level 400.
+        validators = []
+        extra_kwargs = {'section': {'validators': []}}
 
 
 class SectionSerializer(serializers.ModelSerializer):
@@ -62,6 +100,22 @@ class SectionSerializer(serializers.ModelSerializer):
         section_data['quiz'] = QuizSerializer(quiz).data if quiz else None
 
         return section_data
+
+
+class InstructorSectionSerializer(SectionSerializer):
+    # Ordering is managed server-side (auto-assign on create, atomic reorder on
+    # update), so the DRF unique_together validator is dropped and `order` is
+    # optional; the DB unique_together constraint remains the real guard.
+    class Meta(SectionSerializer.Meta):
+        validators = []
+        extra_kwargs = {'order': {'required': False}}
+
+
+class InstructorLectureSerializer(LectureSerializer):
+    class Meta(LectureSerializer.Meta):
+        validators = []
+        extra_kwargs = {'order': {'required': False}}
+
 
 class CourseSerializer(serializers.ModelSerializer):
     instructor_profile = serializers.SerializerMethodField()

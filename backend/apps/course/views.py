@@ -15,8 +15,14 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework import status
 
 from django.conf import settings
-from .serializers import CourseSerializer , SectionSerializer , QuizSerializer , LectureSerializer , InstructorCourseSerializer
-from .models import Course , Section , Quiz , Lecture
+from django.db import transaction
+from .serializers import (
+    CourseSerializer , SectionSerializer , QuizSerializer , LectureSerializer ,
+    InstructorCourseSerializer , InstructorQuizSerializer , QuestionSerializer , ChoiceSerializer ,
+    InstructorSectionSerializer , InstructorLectureSerializer
+)
+from .models import Course , Section , Quiz , Lecture , Question , Choice
+from .reorder import reorder_within_parent
 
 from rest_framework.viewsets import ModelViewSet , ReadOnlyModelViewSet
 
@@ -95,8 +101,14 @@ class InstructorCourseViewSet(ModelViewSet):
         except InstructorProfile.DoesNotExist:
             raise ValidationError("There is no Instructor Profile for this user ")
 
+def _next_order(model, **parent_filter):
+    #  الترتيب الجديد = آخر ترتيب + 1 (يتضاف في نهاية الأب)
+    last = model.objects.filter(**parent_filter).order_by('-order').first()
+    return (last.order + 1) if last else 0
+
+
 class InstructorSectionViewSet(ModelViewSet):
-    serializer_class = SectionSerializer
+    serializer_class = InstructorSectionSerializer
     authentication_classes = [CookieJWTAuthentication]
     permission_classes = [IsAuthenticated, isInstructor]
 
@@ -114,11 +126,27 @@ class InstructorSectionViewSet(ModelViewSet):
         #  نتأكد إن الكورس تبعه هو
         if course.instructor != self.request.user.instructor_profile:
             raise ValidationError({"error": "You don't have access to this section"})
-        serializer.save()
+        order = serializer.validated_data.get('order')
+        #  لو العميل ما بعتش order نحطه في النهاية تلقائيًا
+        if order is None:
+            serializer.save(order=_next_order(Section, course=course))
+        else:
+            serializer.save()
+
+    def perform_update(self, serializer):
+        instance = serializer.instance
+        new_order = serializer.validated_data.get('order')
+        #  لو الترتيب اتغير: نحفظ باقي الحقول عادي، وبعدين نعمل ترقيم آمن للـ order
+        if new_order is not None and new_order != instance.order:
+            serializer.validated_data.pop('order')
+            serializer.save()
+            reorder_within_parent(Section, {'course': instance.course}, instance, new_order)
+        else:
+            serializer.save()
 
 
 class InstructorLectureViewSet(ModelViewSet):
-    serializer_class = LectureSerializer
+    serializer_class = InstructorLectureSerializer
     authentication_classes = [CookieJWTAuthentication]
     permission_classes = [IsAuthenticated, isInstructor]
 
@@ -135,11 +163,31 @@ class InstructorLectureViewSet(ModelViewSet):
         #  نتأكد إن السيكشن تبع كورس له
         if section.course.instructor != self.request.user.instructor_profile:
             raise ValidationError({"error": "You don't have access to this section"})
-        serializer.save()
+        order = serializer.validated_data.get('order')
+        if order is None:
+            serializer.save(order=_next_order(Lecture, section=section))
+        else:
+            serializer.save()
+
+    def perform_update(self, serializer):
+        instance = serializer.instance
+        new_section = serializer.validated_data.get('section')
+        #  نقل المحاضرة لسيكشن تاني خارج نطاق هذه الميزة
+        if new_section is not None and new_section != instance.section:
+            raise ValidationError(
+                {"error": "Moving a lecture to another section isn't supported."}
+            )
+        new_order = serializer.validated_data.get('order')
+        if new_order is not None and new_order != instance.order:
+            serializer.validated_data.pop('order')
+            serializer.save()
+            reorder_within_parent(Lecture, {'section': instance.section}, instance, new_order)
+        else:
+            serializer.save()
 
 
 class InstructorQuizViewSet(ModelViewSet):
-    serializer_class = QuizSerializer
+    serializer_class = InstructorQuizSerializer
     authentication_classes = [CookieJWTAuthentication]
     permission_classes = [IsAuthenticated, isInstructor]
 
@@ -155,7 +203,98 @@ class InstructorQuizViewSet(ModelViewSet):
         section = serializer.validated_data.get('section')
         if section.course.instructor != self.request.user.instructor_profile:
             raise ValidationError({"error": "You don't have access to this section"})
-        serializer.save()
+        #  سيكشن واحد = كويز واحد: نرجّع 400 واضحة بدل الـ 500
+        if Quiz.objects.filter(section=section).exists():
+            raise ValidationError({"error": "This section already has a quiz."})
+        serializer.save(questions_count=0)
+
+
+class InstructorQuestionViewSet(ModelViewSet):
+    serializer_class = QuestionSerializer
+    authentication_classes = [CookieJWTAuthentication]
+    permission_classes = [IsAuthenticated, isInstructor]
+
+    def get_queryset(self):
+        try:
+            qs = Question.objects.filter(
+                quiz__section__course__instructor=self.request.user.instructor_profile
+            )
+        except InstructorProfile.DoesNotExist:
+            return Question.objects.none()
+        #  فلترة أسئلة كويز معيّن للمحرّر
+        quiz_id = self.request.query_params.get('quiz')
+        if quiz_id:
+            qs = qs.filter(quiz_id=quiz_id)
+        return qs.order_by('order')
+
+    def perform_create(self, serializer):
+        quiz = serializer.validated_data.get('quiz')
+        if quiz.section.course.instructor != self.request.user.instructor_profile:
+            raise ValidationError({"error": "You don't have access to this quiz"})
+        order = serializer.validated_data.get('order')
+        if order is None:
+            serializer.save(order=_next_order(Question, quiz=quiz))
+        else:
+            serializer.save()
+        self._sync_count(quiz)
+
+    def perform_update(self, serializer):
+        instance = serializer.instance
+        new_order = serializer.validated_data.get('order')
+        #  ترتيب الأسئلة مافيهوش قيد فريد، بس نستخدم نفس الهيلبر للحفاظ على تسلسل بدون فجوات
+        if new_order is not None and new_order != instance.order:
+            serializer.validated_data.pop('order')
+            serializer.save()
+            reorder_within_parent(Question, {'quiz': instance.quiz}, instance, new_order)
+        else:
+            serializer.save()
+
+    def perform_destroy(self, instance):
+        quiz = instance.quiz
+        instance.delete()
+        self._sync_count(quiz)
+
+    def _sync_count(self, quiz):
+        #  العدّاد يديره السيرفر: يُعاد حسابه بعد كل إضافة/حذف سؤال (FR-009a)
+        Quiz.objects.filter(pk=quiz.pk).update(questions_count=quiz.question.count())
+
+
+class InstructorChoiceViewSet(ModelViewSet):
+    serializer_class = ChoiceSerializer
+    authentication_classes = [CookieJWTAuthentication]
+    permission_classes = [IsAuthenticated, isInstructor]
+
+    def get_queryset(self):
+        try:
+            qs = Choice.objects.filter(
+                question__quiz__section__course__instructor=self.request.user.instructor_profile
+            )
+        except InstructorProfile.DoesNotExist:
+            return Choice.objects.none()
+        question_id = self.request.query_params.get('question')
+        if question_id:
+            qs = qs.filter(question_id=question_id)
+        return qs
+
+    def perform_create(self, serializer):
+        question = serializer.validated_data.get('question')
+        if question.quiz.section.course.instructor != self.request.user.instructor_profile:
+            raise ValidationError({"error": "You don't have access to this question"})
+        with transaction.atomic():
+            choice = serializer.save()
+            self._enforce_single_correct(choice)
+
+    def perform_update(self, serializer):
+        with transaction.atomic():
+            choice = serializer.save()
+            self._enforce_single_correct(choice)
+
+    def _enforce_single_correct(self, choice):
+        #  إجابة صحيحة واحدة لكل سؤال: تعليم واحدة صح يلغي أي واحدة كانت صح قبلها
+        if choice.is_correct:
+            Choice.objects.filter(question=choice.question).exclude(pk=choice.pk).update(
+                is_correct=False
+            )
 
 
 
@@ -168,7 +307,8 @@ class StudentCourseViewSet(ReadOnlyModelViewSet):
     authentication_classes = [CookieJWTAuthentication]
 
     def get_queryset(self):
-        queryset = Course.objects.all()
+        #  الطلاب يشوفوا الكورسات المنشورة فقط — المسودّات مخفية تمامًا (FR-018)
+        queryset = Course.objects.filter(is_published=True)
         categories = self.request.query_params.getlist('category')
         level = self.request.query_params.get('level')
         min_price = self.request.query_params.get('min_price')
@@ -227,16 +367,23 @@ class StudentCourseViewSet(ReadOnlyModelViewSet):
         return response
 
 class StudentSectionViewSet(ReadOnlyModelViewSet):
-    queryset = Section.objects.all()
+    #  محتوى الكورسات المنشورة فقط — لا تسريب لمناهج المسودّات (FR-018)
     serializer_class = SectionSerializer
 
+    def get_queryset(self):
+        return Section.objects.filter(course__is_published=True)
+
 class StudentLectureViewSet(ReadOnlyModelViewSet):
-    queryset = Lecture.objects.all()
     serializer_class = LectureSerializer
 
+    def get_queryset(self):
+        return Lecture.objects.filter(section__course__is_published=True)
+
 class StudentQuizViewSet(ReadOnlyModelViewSet):
-    queryset = Quiz.objects.all()
     serializer_class = QuizSerializer
+
+    def get_queryset(self):
+        return Quiz.objects.filter(section__course__is_published=True)
 
 
 
@@ -245,7 +392,8 @@ class StudentCourseView(ListAPIView):
     serializer_class = CourseSerializer
 
     def get_queryset(self):
-        queryset = Course.objects.all()
+        #  الهوم بيج كمان: كورسات منشورة فقط (FR-018)
+        queryset = Course.objects.filter(is_published=True)
         return queryset
 
     def get_enrolled_course_ids(self, user, course_ids):
