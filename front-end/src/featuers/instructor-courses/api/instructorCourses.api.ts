@@ -1,5 +1,5 @@
 import axiosInstance from '@/lib/axios';
-import uploadToCloudinary from '@/lib/cloudinary';
+import { uploadImageToCloudinary } from '@/lib/cloudinary';
 import { InstructorCourse } from '../types/instructorCourses.types';
 import { CourseFormData } from '../schemas/instructorCourses.schma';
 
@@ -26,7 +26,7 @@ function toPayload(form: CourseFormData, thumbnailUrl?: string) {
 
 async function resolveThumbnail(files?: FileList): Promise<string | undefined> {
     if (files instanceof FileList && files.length > 0) {
-        return uploadToCloudinary(files[0]);
+        return uploadImageToCloudinary(files[0]);
     }
     return undefined;
 }

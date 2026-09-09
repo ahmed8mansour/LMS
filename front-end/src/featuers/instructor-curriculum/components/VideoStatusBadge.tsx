@@ -14,13 +14,26 @@ const STYLES: Record<VideoStatus, string> = {
     FAILED: 'border-red-400 text-red-600',
 };
 
-// Read-only lecture video status (upload itself is spec 006).
-export function VideoStatusBadge({ status }: { status: VideoStatus }) {
+interface VideoStatusBadgeProps {
+    status: VideoStatus;
+    /** Whether an asset is actually attached to the lecture. */
+    hasVideo?: boolean;
+}
+
+// Read-only lecture video status.
+//
+// `hasVideo` is what keeps this honest: a lecture can be PENDING with an asset
+// attached (an upload still being processed), and reading the status alone would
+// label that "No video" — telling the instructor to upload something they just
+// uploaded.
+export function VideoStatusBadge({ status, hasVideo }: VideoStatusBadgeProps) {
+    const effective: VideoStatus = status === 'PENDING' && hasVideo ? 'PROCESSING' : status;
+
     return (
         <span
-            className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${STYLES[status]}`}
+            className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${STYLES[effective]}`}
         >
-            {LABELS[status]}
+            {LABELS[effective]}
         </span>
     );
 }

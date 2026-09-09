@@ -27,7 +27,7 @@ export function LectureRow({ lecture, courseId, hasEnrollments, handleProps, onD
             >
                 <GripVertical className="h-4 w-4" />
             </button>
-            <VideoStatusBadge status={lecture.video_status} />
+            <VideoStatusBadge status={lecture.video_status} hasVideo={lecture.has_video} />
             <span className="flex-1 truncate text-sm text-darktext">{lecture.title}</span>
             <span className="font-mono text-xs text-graytext2">{formatMinutes(lecture.duration)}</span>
             <Link

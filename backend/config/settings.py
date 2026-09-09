@@ -143,6 +143,13 @@ REST_FRAMEWORK = {
         'login': '5/min',
         'otp': '3/min',
         'register': '3/min',
+        # Signing mints credentials against our own paid Cloudinary storage, so
+        # it needs a ceiling; 20/min is far above any human authoring rate.
+        'video_signature': '20/min',
+        # The webhook is public and unauthenticated, so it needs one too — but
+        # well above Cloudinary's legitimate burst/retry rate, or we'd drop real
+        # completion callbacks and wedge lectures in PROCESSING.
+        'video_webhook': '120/min',
     },
 }
 
@@ -177,6 +184,18 @@ CLOUDINARY_STORAGE = {
 # Cloudinary Video Configuration
 VIDEO_PROVIDER = 'cloudinary'
 CLOUDINARY_VIDEO_WEBHOOK_URL = env('CLOUDINARY_VIDEO_WEBHOOK_URL')
+
+# Upload limits. These are signed INTO the upload credentials, so Cloudinary
+# itself rejects an oversized or wrong-format file — a bypassed client-side
+# check changes nothing. The client also reads them to state the real limit and
+# to refuse a bad file before spending the upload.
+VIDEO_MAX_UPLOAD_BYTES = env.int('VIDEO_MAX_UPLOAD_BYTES', default=2 * 1024 * 1024 * 1024)  # 2 GiB
+VIDEO_ALLOWED_FORMATS = env('VIDEO_ALLOWED_FORMATS', default='mp4,mov,webm,mkv,m4v')
+
+# How old a Cloudinary webhook may be before we refuse it. Without an age bound
+# a captured notification body stays a valid forgery forever; 2h is well past
+# Cloudinary's retry window and absorbs clock skew.
+CLOUDINARY_WEBHOOK_MAX_AGE_SECONDS = env.int('CLOUDINARY_WEBHOOK_MAX_AGE_SECONDS', default=7200)
 
 
 # هادا في مشكلة 

@@ -1,7 +1,7 @@
 import axiosInstance from '@/lib/axios';
 import { RegisterFormData  , UserProfileFormData } from '../schemas/auth.schma';
 import {  UserChangePasswordRequest , UserChangePasswordResponse ,   ForgetPasswordResetRequest , ForgetPasswordResetResponse , RefreshAccessTokenResponse , RegisterVerifyOTP , RegisterResendOTP , LoginBody, GoogleLoginRequest , ForgetPasswordSendOTPResponse , ForgetPasswordVerifyOTPResponse , GoogleRegisterRequest, GoogleAuthResponse, UserProfile, GoogleSetPasswordVerifyOTPRequest, GoogleSetPasswordResetRequest } from "../types/auth.types";
-import uploadToCloudinary from '@/lib/cloudinary';
+import { uploadImageToCloudinary } from '@/lib/cloudinary';
 // post(url , body , config)
 async function userRegister(requestBody: RegisterFormData){
     const {data} = await axiosInstance.post("/auth/user/register/sendOTP/",requestBody) 
@@ -35,7 +35,7 @@ async function updateUserProfile(requestBody : UserProfileFormData): Promise<Use
     let profilePictureUrl: string | undefined;
     
     if (requestBody.profile_picture instanceof FileList && requestBody.profile_picture.length > 0) {
-        profilePictureUrl = await uploadToCloudinary(requestBody.profile_picture[0]);
+        profilePictureUrl = await uploadImageToCloudinary(requestBody.profile_picture[0]);
     }
 
 
