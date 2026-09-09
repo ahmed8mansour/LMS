@@ -14,7 +14,9 @@ import { instructorCurriculumAPI } from '../api/instructorCurriculum.api';
 import { useLectureMutations } from '../hooks/useLectureMutations';
 import { lectureSchema, LectureFormData } from '../schemas/instructorCurriculum.schma';
 import { formatMinutes } from '@/lib/duration';
-import { VideoSlotPlaceholder } from './VideoSlotPlaceholder';
+
+import { InstructorVideoUpload } from '@/featuers/instructor-video-uploading';
+
 
 interface LectureEditorProps {
     courseId: number;
@@ -105,7 +107,8 @@ export function LectureEditor({ courseId, lectureId }: LectureEditorProps) {
                     </div>
                 </form>
 
-                <VideoSlotPlaceholder status={lectureQuery.data.video_status} />
+
+                <InstructorVideoUpload lectureId={lectureId} courseId={courseId} />
             </div>
         </div>
     );

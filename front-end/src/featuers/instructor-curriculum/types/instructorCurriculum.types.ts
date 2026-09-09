@@ -3,7 +3,11 @@
 // quiz content (questions + choices) comes from the new questions endpoint.
 // DRF serializes Decimal fields as strings, hence `duration` is a string.
 
-export type VideoStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+// Defined once in @/lib/video (the atoms need it too, and an atom must not
+// import from a feature module); re-exported here so existing importers of this
+// module are unaffected.
+export type { VideoStatus } from '@/lib/video';
+import type { VideoStatus } from '@/lib/video';
 
 export interface Choice {
     id: number;
@@ -36,6 +40,10 @@ export interface Lecture {
     order: number;
     video_status: VideoStatus;
     video_url: string | null;
+    // Whether an asset is attached at all. Distinguishes a lecture that is still
+    // processing an upload from one that has no video, which video_status alone
+    // cannot (both can read PENDING).
+    has_video: boolean;
 }
 
 export interface Section {

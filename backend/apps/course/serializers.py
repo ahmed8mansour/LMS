@@ -15,13 +15,20 @@ from .video.access import can_access_lecture_video
 
 class LectureSerializer(serializers.ModelSerializer):
     video_url = serializers.SerializerMethodField()
+    has_video = serializers.SerializerMethodField()
 
     class Meta:
         model = Lecture
         # video_public_id is managed by the video subsystem (assigned at
         # signature time, updated by the webhook), never written by clients.
-        fields = ['id', 'section', 'title', 'duration', 'order', 'video_status', 'video_url']
+        fields = ['id', 'section', 'title', 'duration', 'order', 'video_status', 'video_url', 'has_video']
         read_only_fields = ['video_status']
+
+    def get_has_video(self, obj):
+        # Whether a video asset is attached at all. Lets the client tell a
+        # still-processing lecture (has_video + status != COMPLETED) apart from
+        # an empty one, which video_url alone can't do (both are null there).
+        return bool(obj.video_public_id)
 
     def get_video_url(self, obj):
         if not obj.video_public_id or obj.video_status != 'COMPLETED':

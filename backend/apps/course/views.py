@@ -39,7 +39,9 @@ from .pagination import CourseCursorPagination
 
 from rest_framework.generics import ListAPIView
 from apps.enrollment.models import Enrollment
-from .video.service import VideoUploadService, VideoWebhookService
+from .video.service import (
+    VideoUploadService, VideoWebhookService, VideoLifecycleService, VideoAssetError,
+)
 # Create your views here.
 
 logger = logging.getLogger(__name__)
@@ -420,42 +422,110 @@ class StudentCourseView(ListAPIView):
         return response
 
 
+def _get_owned_lecture(request, lecture_id):
+    """Fetch a lecture and enforce that the requester owns its course."""
+    lecture = (
+        Lecture.objects
+        .select_related('section__course__instructor')
+        .filter(id=lecture_id)
+        .first()
+    )
+    if not lecture:
+        raise NotFound("Lecture not found")
+    if not request.user.is_superuser and lecture.section.course.instructor.user_id != request.user.id:
+        raise PermissionDenied("You don't have access to this lecture")
+    return lecture
+
+
 class VideoUploadSignatureView(APIView):
     """
     POST /courses/video/upload-signature/
 
-    Returns signed Cloudinary upload params so the browser can upload
-    directly to Cloudinary (chunked), never through this server.
+    Returns signed Cloudinary upload params so the browser can upload the file
+    directly to Cloudinary, never through this server.
 
-    body: { "lecture_id": <int> }  -> binds the upload to that lecture: the
-           generated public_id is saved on the lecture up front, so the
-           completion webhook always finds the row (no upload/webhook race).
-    body: {}                       -> generic upload, not bound to a lecture.
+    body: { "lecture_id": <int> }  -> required. Every signed upload is bound to a
+           lecture the caller owns; there is no unbound mode, because minting
+           uncapped upload credentials against our own storage for anyone past
+           the instructor gate is a cost and abuse vector with no caller.
+
+    The generated public_id is reserved on the lecture as *pending*. The
+    lecture's live video, status, and duration are untouched — signing an upload
+    is not a commitment to it, and an abandoned one must leave the lecture
+    exactly as it was.
     """
     authentication_classes = [CookieJWTAuthentication]
     permission_classes = [IsAuthenticated, (isInstructor | isAdmin)]
+    throttle_scope = 'video_signature'
 
     def post(self, request):
-        lecture = None
         lecture_id = request.data.get('lecture_id')
-        if lecture_id is not None:
-            lecture = self._get_owned_lecture(request, lecture_id)
+        if lecture_id in (None, ''):
+            return Response(
+                {'error': 'lecture_id is required.'}, status=status.HTTP_400_BAD_REQUEST
+            )
 
+        lecture = _get_owned_lecture(request, lecture_id)
         credentials = VideoUploadService().credentials_for(lecture)
         return Response(asdict(credentials), status=status.HTTP_200_OK)
 
-    def _get_owned_lecture(self, request, lecture_id):
-        lecture = (
-            Lecture.objects
-            .select_related('section__course__instructor')
-            .filter(id=lecture_id)
-            .first()
-        )
-        if not lecture:
-            raise NotFound("Lecture not found")
-        if not request.user.is_superuser and lecture.section.course.instructor.user_id != request.user.id:
-            raise PermissionDenied("You don't have access to this lecture")
-        return lecture
+
+class VideoConfirmView(APIView):
+    """
+    POST /courses/video/<lecture_id>/confirm/
+
+    Called once Cloudinary has accepted the upload. Promotes the pending asset
+    to be the lecture's live video and moves it to PROCESSING, destroying the
+    superseded asset only after the new one is in place.
+
+    body: { "public_id": "<the id that was uploaded>" }
+
+    Not required for correctness — the completion webhook performs the same
+    promotion if this call never arrives. It exists so the instructor sees the
+    lecture move to "processing" immediately instead of waiting on the transcode.
+    """
+    authentication_classes = [CookieJWTAuthentication]
+    permission_classes = [IsAuthenticated, (isInstructor | isAdmin)]
+    throttle_scope = 'video_signature'
+
+    def post(self, request, lecture_id):
+        lecture = _get_owned_lecture(request, lecture_id)
+
+        public_id = request.data.get('public_id')
+        if not public_id:
+            return Response(
+                {'error': 'public_id is required.'}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            VideoLifecycleService().promote(lecture, public_id)
+        except VideoAssetError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = LectureSerializer(lecture, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class VideoDeleteView(APIView):
+    """
+    DELETE /courses/video/<lecture_id>/
+
+    Removes the lecture's video: destroys the live asset and any in-flight one,
+    then resets the lecture to "no video". The lecture's own fields (title,
+    order, duration) are left alone.
+
+    Available from every status, PROCESSING included — refusing to remove a
+    still-processing video is how an instructor ends up stranded with a stuck
+    lecture and no way out.
+    """
+    authentication_classes = [CookieJWTAuthentication]
+    permission_classes = [IsAuthenticated, (isInstructor | isAdmin)]
+    throttle_scope = 'video_signature'
+
+    def delete(self, request, lecture_id):
+        lecture = _get_owned_lecture(request, lecture_id)
+        VideoLifecycleService().remove(lecture)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class VideoWebhookView(APIView):
@@ -464,9 +534,14 @@ class VideoWebhookView(APIView):
 
     Called by Cloudinary (not the frontend) when eager HLS transcoding
     finishes. Verified via Cloudinary's signature headers, not JWT auth.
+
+    A 200 means "handled, don't retry" — which covers duplicates, notifications
+    that carry no transcode verdict, and notifications for assets we no longer
+    track. Only a failed authenticity check is a 400.
     """
     authentication_classes = []
     permission_classes = [AllowAny]
+    throttle_scope = 'video_webhook'
 
     def post(self, request):
         signature = request.headers.get('X-Cld-Signature', '')

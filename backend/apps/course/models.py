@@ -59,8 +59,19 @@ class Section(models.Model):
 class Lecture(models.Model):
     section = models.ForeignKey('Section' , on_delete=models.CASCADE , related_name='lectures')
     title=models.CharField( max_length=255 )    
+    # Decimal MINUTES (never seconds) — the instructor enters mm:ss and the
+    # video webhook converts the provider's measured seconds before writing here.
     duration = models.DecimalField(max_digits=6 , decimal_places=2)
+    # The lecture's LIVE video asset: what it actually plays. Only ever set to an
+    # asset confirmed to exist, so the row never points at media that isn't there.
     video_public_id = models.CharField(max_length=255, null=True, blank=True)
+    # The IN-FLIGHT upload target, reserved at signature time. Kept apart from
+    # video_public_id so signing (or abandoning) an upload can't disturb the video
+    # the lecture is currently serving — promotion happens only once the upload is
+    # confirmed to have landed. This split is what makes "replace" safe.
+    pending_video_public_id = models.CharField(max_length=255, null=True, blank=True)
+    # PENDING strictly means "no video attached" (video_public_id IS NULL); the
+    # other three all imply one is.
     video_status = models.CharField(max_length=20, choices=[
         ('PENDING', 'Pending'),
         ('PROCESSING', 'Processing'),
