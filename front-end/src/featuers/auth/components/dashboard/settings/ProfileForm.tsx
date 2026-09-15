@@ -24,6 +24,12 @@ export function ProfileForm() {
     // get user profile logic
     const { data: user, isLoading : isFetchingUserData, isError: FetchingUserDataFailed  } = useProfile();
 
+    // specific_data is role-dependent (Record<string, unknown>), so `about` must be
+    // narrowed before it's rendered or used as a textarea value. Only the
+    // instructor profile has it; for everyone else this is ''.
+    const rawAbout = user?.specific_data?.about
+    const about = typeof rawAbout === 'string' ? rawAbout : ''
+
 
 
 
@@ -164,11 +170,11 @@ export function ProfileForm() {
                 </div>
             </div>
 
-            {user?.specific_data?.about && 
+            {about &&
             
             <div className="md:col-span-2 space-y-2">
                 <Label htmlFor="bio">Bio</Label>
-                <textarea className="w-full px-4 py-2.5 rounded-lg border border-border bg-muted focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all resize-none" id="bio" placeholder="Write a short biography about yourself..." rows={4} defaultValue={user?.specific_data?.about}></textarea>
+                <textarea className="w-full px-4 py-2.5 rounded-lg border border-border bg-muted focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all resize-none" id="bio" placeholder="Write a short biography about yourself..." rows={4} defaultValue={about}></textarea>
             </div>
             }
 

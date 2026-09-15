@@ -5,14 +5,14 @@ import Image from 'next/image';
 import { ImageIcon, Pencil, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/atoms/button';
-import { InstructorCourse, statusOf } from '../types/instructorCourses.types';
+import { InstructorCourse } from '../types/instructorCourses.types';
 import { DeleteCourseDialog } from './DeleteCourseDialog';
+import { PublishPanel } from './PublishPanel';
 
-// Read-only summary of a course. Publish status is display-only here — the publish
-// action and its readiness gate are delivered by spec 007 (FR-013).
+// Summary of a course. Publish status and the publish action live in PublishPanel
+// (spec 007), which replaced the read-only status badge 004 left here.
 export function CourseOverview({ course }: { course: InstructorCourse }) {
     const router = useRouter();
-    const status = statusOf(course);
 
     return (
         <div className="flex flex-col gap-6">
@@ -26,18 +26,7 @@ export function CourseOverview({ course }: { course: InstructorCourse }) {
                 </div>
 
                 <div className="flex-1">
-                    <div className="flex items-center gap-3">
-                        <h2 className="text-xl font-bold text-darktext">{course.title}</h2>
-                        <span
-                            className={`rounded px-2 py-1 text-xs font-semibold ${
-                                status === 'published'
-                                    ? 'bg-darkmint text-white'
-                                    : 'bg-lightbg text-graytext2 ring-1 ring-graytext/20'
-                            }`}
-                        >
-                            {status === 'published' ? 'Published' : 'Draft'}
-                        </span>
-                    </div>
+                    <h2 className="text-xl font-bold text-darktext">{course.title}</h2>
                     <p className="mt-2 max-w-2xl text-sm text-graytext2">{course.description}</p>
                 </div>
 
@@ -58,6 +47,8 @@ export function CourseOverview({ course }: { course: InstructorCourse }) {
                     />
                 </div>
             </div>
+
+            <PublishPanel course={course} />
 
             <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
                 <Detail term="Category" value={course.category} />

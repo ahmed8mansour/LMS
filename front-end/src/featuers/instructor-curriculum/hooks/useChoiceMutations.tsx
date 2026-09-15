@@ -7,8 +7,12 @@ import { handleAuthError } from '@/lib/toast';
 // others server-side; we just refetch the quiz content afterwards.
 export function useChoiceMutations(quizId: number) {
     const queryClient = useQueryClient();
-    const invalidate = () =>
+    const invalidate = () => {
         queryClient.invalidateQueries({ queryKey: ['instructor', 'quiz-content', quizId] });
+        // Choice count and the correct-answer mark decide question completeness,
+        // which blocks publishing (spec 007) — refresh readiness too (research R9).
+        queryClient.invalidateQueries({ queryKey: ['instructor', 'course'] });
+    };
 
     const create = useMutation({
         mutationFn: ({ questionId, text }: { questionId: number; text: string }) =>

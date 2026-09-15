@@ -150,6 +150,10 @@ REST_FRAMEWORK = {
         # well above Cloudinary's legitimate burst/retry rate, or we'd drop real
         # completion callbacks and wedge lectures in PROCESSING.
         'video_webhook': '120/min',
+        # Publish/unpublish is a student-visible catalog change. This is a churn
+        # ceiling, not a security boundary — ownership is enforced by the viewset
+        # queryset. Scoped to those two actions only via get_throttles().
+        'course_publish': '20/min',
     },
 }
 

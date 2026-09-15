@@ -11,7 +11,10 @@ export function useLogin() {
         onSuccess(data: any, variables, onMutateResult, context) {
             toastsuccess('Login is successful', data.message)
         },
-        onError(error: AxiosError, variables, onMutateResult, context) {
+        // DRF wraps serializer ValidationError messages in a list, so the login
+        // error arrives as { error: ["..."] }. Typing it here types `error` for
+        // every caller's onError too (LoginForm reads error.response.data.error).
+        onError(error: AxiosError<{ error?: string[] }>, variables, onMutateResult, context) {
             handleAuthError(error, 'Login Failed')
         },
     })
