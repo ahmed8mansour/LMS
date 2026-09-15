@@ -16,7 +16,9 @@ const ROUTES = {
     coursePlayer: "/dashboard/learn",
 } as const;
 
-const PUBLIC_ROUTES = [ROUTES.login, ROUTES.register];
+// Widened to string[] so `.includes(path)` accepts any request path; the literal
+// type ("/login" | "/register")[] rejected a plain string. Same values, same behavior.
+const PUBLIC_ROUTES: readonly string[] = [ROUTES.login, ROUTES.register];
 const PROTECTED_PREFIXES = [ROUTES.studentHome, ROUTES.instructorHome];
 
 type RoutingRole = "student" | "instructor" | "admin";

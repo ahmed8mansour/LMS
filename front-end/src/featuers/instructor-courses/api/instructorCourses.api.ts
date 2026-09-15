@@ -1,6 +1,10 @@
 import axiosInstance from '@/lib/axios';
 import { uploadImageToCloudinary } from '@/lib/cloudinary';
-import { InstructorCourse } from '../types/instructorCourses.types';
+import {
+    InstructorCourse,
+    PublishTransition,
+    ReadinessReport,
+} from '../types/instructorCourses.types';
 import { CourseFormData } from '../schemas/instructorCourses.schma';
 
 const BASE = '/courses/instructor/courses/';
@@ -58,10 +62,33 @@ async function remove(id: number): Promise<void> {
     await axiosInstance.delete(`${BASE}${id}/`);
 }
 
+// --- Publishing (spec 007) ---------------------------------------------------
+// Readiness is computed on the server and rendered verbatim; the client never
+// re-derives it (research R4). Publish/unpublish take no body — the route is the
+// intent. A refused publish rejects with 400 { error, blockers }.
+
+async function readiness(id: number): Promise<ReadinessReport> {
+    const { data } = await axiosInstance.get(`${BASE}${id}/readiness/`);
+    return data;
+}
+
+async function publish(id: number): Promise<PublishTransition> {
+    const { data } = await axiosInstance.post(`${BASE}${id}/publish/`);
+    return data;
+}
+
+async function unpublish(id: number): Promise<PublishTransition> {
+    const { data } = await axiosInstance.post(`${BASE}${id}/unpublish/`);
+    return data;
+}
+
 export const instructorCoursesAPI = {
     list,
     get,
     create,
     update,
     remove,
+    readiness,
+    publish,
+    unpublish,
 };

@@ -31,6 +31,10 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 
 from apps.authentication.utils import CookieJWTAuthentication
 from apps.authentication.models import InstructorProfile
+from rest_framework.decorators import action
+from rest_framework.throttling import ScopedRateThrottle
+
+from .publishing import READINESS_PREFETCH, CoursePublishingService, PublishReadinessService
 
 from rest_framework.serializers import ValidationError
 from rest_framework.exceptions import NotFound, PermissionDenied
@@ -84,10 +88,75 @@ class InstructorCourseViewSet(ModelViewSet):
 
     def get_queryset(self):
         try:
-            return Course.objects.filter(instructor=self.request.user.instructor_profile)
+            # READINESS_PREFETCH covers exactly the relations PublishReadinessService
+            # reads, so the is_publishable / needs_attention fields add no queries
+            # per course on the list. Drop it and readiness alone becomes an N+1.
+            # (research R5)
+            return (
+                Course.objects
+                .filter(instructor=self.request.user.instructor_profile)
+                .prefetch_related(*READINESS_PREFETCH)
+            )
         except InstructorProfile.DoesNotExist:
+            # Also what makes publishing safe for a staff account with no
+            # profile: every @action resolves through here, so it gets a clean
+            # 404 rather than an AttributeError (FR-029).
             return Course.objects.none()
-    
+
+    def get_throttles(self):
+        # Publishing is a student-visible catalog change; the CRUD routes stay on
+        # the project default. throttle_scope can't be passed via @action (it isn't
+        # an APIView attribute, so DRF's initkwargs validation rejects it) and must
+        # not be set at class level, which would throttle list/retrieve/create/
+        # destroy too. Safe to assign on self: DRF builds a new view per request.
+        # (research R10)
+        if self.action in ('publish', 'unpublish'):
+            self.throttle_scope = 'course_publish'
+            return [ScopedRateThrottle()]
+        return super().get_throttles()
+
+    # ---- Publishing (spec 007) ------------------------------------------------
+    # Each action resolves the course through self.get_object(), i.e. inside
+    # get_queryset(): another instructor's course is a 404 before any code here
+    # runs (research R2). Keep these thin — every rule lives in publishing/.
+
+    @action(detail=True, methods=['get'])
+    def readiness(self, request, pk=None):
+        # Read-only: computes the verdict from current content and writes nothing.
+        # get_object() carries the queryset's prefetch, so this costs no queries
+        # beyond the ones get_queryset() already makes.
+        report = PublishReadinessService().evaluate(self.get_object())
+        return Response(report.to_dict(), status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'])
+    def publish(self, request, pk=None):
+        course = self.get_object()
+        try:
+            result, report = CoursePublishingService().publish(course)
+        except Course.DoesNotExist:
+            # Deleted between get_object() and the row lock.
+            return Response({'error': 'Course not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        if result.refused:
+            # Additive `blockers` beside the required `error` message (research R7).
+            return Response(
+                {'error': result.detail, 'blockers': [asdict(item) for item in result.blockers]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response(_transition_payload(result, report), status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'])
+    def unpublish(self, request, pk=None):
+        # No refusal path: readiness is never a condition for unpublishing
+        # (FR-016). Enrollments, orders, progress, and reviews are untouched — the
+        # service writes is_published and nothing else (FR-031).
+        course = self.get_object()
+        try:
+            result, report = CoursePublishingService().unpublish(course)
+        except Course.DoesNotExist:
+            return Response({'error': 'Course not found'}, status=status.HTTP_404_NOT_FOUND)
+        return Response(_transition_payload(result, report), status=status.HTTP_200_OK)
+
     # نربط الكورس مع الانستراكتور الاصلي
     # الحقول اللي بيديرها السيرفر (read-only) لازم ندي لها قيم افتراضية عند الإنشاء
     # لأن الموديل مفيهاش default → من غير كده الـ create هيكسر بـ IntegrityError
@@ -102,6 +171,12 @@ class InstructorCourseViewSet(ModelViewSet):
             )
         except InstructorProfile.DoesNotExist:
             raise ValidationError("There is no Instructor Profile for this user ")
+
+def _transition_payload(result, report):
+    # One shape for both publish and unpublish: the fresh readiness report plus
+    # what happened, so the client refreshes a single cache entry.
+    return {**report.to_dict(), 'changed': result.changed, 'detail': result.detail}
+
 
 def _next_order(model, **parent_filter):
     #  الترتيب الجديد = آخر ترتيب + 1 (يتضاف في نهاية الأب)

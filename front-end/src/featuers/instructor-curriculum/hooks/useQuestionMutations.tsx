@@ -7,8 +7,13 @@ import { handleAuthError } from '@/lib/toast';
 // content query so the editor reflects the change (and question count).
 export function useQuestionMutations(quizId: number) {
     const queryClient = useQueryClient();
-    const invalidate = () =>
+    const invalidate = () => {
         queryClient.invalidateQueries({ queryKey: ['instructor', 'quiz-content', quizId] });
+        // Question completeness is a publish blocker (spec 007), so readiness must
+        // refresh too. The ['instructor', 'course'] prefix covers every course's
+        // readiness query without this hook needing a courseId (research R9).
+        queryClient.invalidateQueries({ queryKey: ['instructor', 'course'] });
+    };
 
     const create = useMutation({
         mutationFn: (text: string) => instructorCurriculumAPI.createQuestion(quizId, text),

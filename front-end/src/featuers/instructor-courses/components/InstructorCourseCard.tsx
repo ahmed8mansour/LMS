@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { ImageIcon, Trash2 } from 'lucide-react';
+import { ImageIcon, Trash2, TriangleAlert } from 'lucide-react';
 import { Button } from '@/components/atoms/button';
 import { InstructorCourse, statusOf } from '../types/instructorCourses.types';
 import { DeleteCourseDialog } from './DeleteCourseDialog';
@@ -37,6 +37,13 @@ export function InstructorCourseCard({ course }: { course: InstructorCourse }) {
                 >
                     {status === 'published' ? 'Published' : 'Draft'}
                 </span>
+                {/* A flag on top of the status, not a fourth status: the course is
+                    still live, it just no longer meets the publish bar (FR-025). */}
+                {course.needs_attention && (
+                    <span className="absolute right-3 top-3 flex items-center gap-1 rounded bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-800 shadow ring-1 ring-amber-300">
+                        <TriangleAlert className="h-3.5 w-3.5" aria-hidden /> Needs attention
+                    </span>
+                )}
             </div>
 
             <div className="flex flex-1 flex-col gap-2 p-5">

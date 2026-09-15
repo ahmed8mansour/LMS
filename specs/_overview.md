@@ -102,6 +102,12 @@ Course
   - Lectures with video URLs and duration
   - One quiz per section with questions and multiple-choice answers
 - **Course Metadata**: Title, description, thumbnail, price, category, level, language, rating, subscriber count
+- **Publishing (spec 007)**: Instructors publish/unpublish their own courses from the course workspace.
+  Publishing is gated server-side on readiness (thumbnail, ≥1 section, no empty sections, every lecture's
+  video ready, every existing quiz complete); refusals name the specific items. Unpublishing is always
+  allowed and never affects enrolled students. A live course that stops qualifying is flagged "needs
+  attention", never auto-unpublished. Lifecycle is a State pattern over `is_published` in
+  `apps/course/publishing/`; no schema change.
 
 ### Course Discovery (Complete)
 
@@ -224,6 +230,9 @@ Course
 | `/student/courses/`    | Read   | List/retrieve courses     |
 | `/student/homepage/`   | Read   | Homepage featured courses |
 | `/instructor/courses/` | CRUD   | Instructor's own courses  |
+| `/instructor/courses/<id>/readiness/` | GET  | Itemized publish-readiness report (spec 007) |
+| `/instructor/courses/<id>/publish/`   | POST | Publish, gated on readiness; 400 lists blockers |
+| `/instructor/courses/<id>/unpublish/` | POST | Unpublish; ungated, enrolled students keep access |
 | `/admin/courses/`      | CRUD   | All courses (admin)       |
 
 | Corresponding `/sections/`, `/lectures/`, `/quizzes/` endpoints exist for each role

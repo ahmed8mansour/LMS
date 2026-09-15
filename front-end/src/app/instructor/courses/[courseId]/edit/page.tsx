@@ -1,6 +1,7 @@
 'use client';
 
 import { useParams } from 'next/navigation';
+import { Info } from 'lucide-react';
 import BounceLoader from '@/components/atoms/bouncing-loader';
 import {
     CourseForm,
@@ -47,6 +48,17 @@ export default function EditCoursePage() {
                 <h1 className="text-2xl font-bold text-darktext">Edit course</h1>
                 <p className="text-sm text-graytext2">Update the details or replace the thumbnail.</p>
             </div>
+
+            {/* No versioning exists, so this notice is the whole mitigation (FR-027). */}
+            {course.is_published && (
+                <p
+                    role="note"
+                    className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+                >
+                    <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden />
+                    This course is live. Changes you save are visible to enrolled students immediately.
+                </p>
+            )}
 
             <CourseForm
                 mode="edit"

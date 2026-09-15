@@ -12,6 +12,7 @@ from django.forms.models import model_to_dict
 from apps.authentication.serializers import UserDataSerializer
 from .video.factory import get_video_provider
 from .video.access import can_access_lecture_video
+from .publishing import PublishReadinessService
 
 class LectureSerializer(serializers.ModelSerializer):
     video_url = serializers.SerializerMethodField()
@@ -167,6 +168,11 @@ class CourseSerializer(serializers.ModelSerializer):
 class InstructorCourseSerializer(serializers.ModelSerializer):
     instructor_profile = serializers.SerializerMethodField()
     sections = serializers.SerializerMethodField()
+    # Readiness verdict (spec 007). Instructor-only on purpose — the student
+    # CourseSerializer does not carry these. Booleans only: the itemized report is
+    # the readiness action's job; My Courses just needs a badge (research R6).
+    is_publishable = serializers.SerializerMethodField()
+    needs_attention = serializers.SerializerMethodField()
 
 
     class Meta:
@@ -176,9 +182,11 @@ class InstructorCourseSerializer(serializers.ModelSerializer):
             'category', 'level', 'price', 'rating',
             'subscribers_count', 'reviews_count', 'is_published','language',
             'last_updated', 'goals_list',
-            'instructor_profile', 'sections',   
-            
+            'instructor_profile', 'sections',
+            'is_publishable', 'needs_attention',
         ]
+        # is_published stays read-only: publishing is its own action and must never
+        # be reachable through a metadata save (FR-003).
         read_only_fields = ['rating' , 'subscribers_count', 'is_published' , 'reviews_count']
         
 
@@ -201,6 +209,17 @@ class InstructorCourseSerializer(serializers.ModelSerializer):
             return []
         return SectionSerializer(sections, many=True, context = self.context).data
 
+    def get_is_publishable(self, obj):
+        return self._readiness.is_publishable
+
+    def get_needs_attention(self, obj):
+        return self._readiness.needs_attention
+
     def to_representation(self, instance):
+        # Evaluate once per course and let both fields read that one verdict.
+        # With many=True DRF reuses this child serializer for every item, but
+        # this runs immediately before that item's fields are read, so each
+        # course gets its own report.
+        self._readiness = PublishReadinessService().evaluate(instance)
         return super().to_representation(instance)
 

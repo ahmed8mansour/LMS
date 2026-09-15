@@ -28,7 +28,9 @@ export function useCreatePaymentIntent() {
 
             router.replace(`/courses/checkout/${data.order.id}/`);
         },
-        onError(error: AxiosError) {
+        // Payment errors come from _map_payment_exception: { error }, plus order_id
+        // on the 409 "checkout already in progress" case.
+        onError(error: AxiosError<{ error?: string; order_id?: number }>) {
             // 409: a pending checkout already exists for this course. Resume it
             // instead of erroring — the checkout page self-fetches a fresh
             // client_secret via GetOrderDetails, so we only need the order id.

@@ -58,6 +58,10 @@ export interface Section {
 // A question is "complete" when it has text, at least two choices, and exactly
 // one correct choice (FR-010). Incomplete questions persist mid-edit but are
 // flagged in the UI.
+//
+// This copy only drives the quiz editor's inline badge. The PUBLISH GATE is the
+// server's copy of the same rule in backend/apps/course/publishing/readiness.py
+// (`quiz_incomplete_question`) — keep the two in step (spec 007, research R4).
 export function isQuestionComplete(q: Question): boolean {
     const correctCount = q.choices.filter((c) => c.is_correct).length;
     return q.text.trim().length > 0 && q.choices.length >= 2 && correctCount === 1;
