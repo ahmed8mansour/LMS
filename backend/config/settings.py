@@ -154,6 +154,9 @@ REST_FRAMEWORK = {
         # ceiling, not a security boundary — ownership is enforced by the viewset
         # queryset. Scoped to those two actions only via get_throttles().
         'course_publish': '20/min',
+        # The heaviest instructor read (readiness over every course plus aggregates).
+        # A ceiling against a runaway client loop, not a security boundary.
+        'instructor_dashboard': '60/min',
     },
 }
 

@@ -108,6 +108,12 @@ Course
   allowed and never affects enrolled students. A live course that stops qualifying is flagged "needs
   attention", never auto-unpublished. Lifecycle is a State pattern over `is_published` in
   `apps/course/publishing/`; no schema change.
+- **Instructor Dashboard (spec 008)**: The instructor home is a read-only dashboard: four lifetime tiles
+  (courses, distinct students, the public instructor rating, gross earnings from paid orders), the 5 most
+  recent enrollments and reviews, and a ranked "needs attention" list (live course failing readiness, failed
+  video, ready to publish, draft in progress) built on the 007 readiness verdict. Instructors with no courses
+  see an onboarding checklist instead. Served as one all-or-nothing snapshot by
+  `GET /courses/instructor/dashboard/` (`apps/course/dashboard/`); no schema change.
 
 ### Course Discovery (Complete)
 
@@ -171,11 +177,10 @@ Course
 
 ### 2. Instructor Dashboard
 
-**Status**: Not implemented
-**Current**: Instructor APIs exist (course/section/lecture/quiz CRUD)
+**Status**: Partially implemented
+**Current**: Instructor APIs exist (course/section/lecture/quiz CRUD); the dashboard page is done (spec 008)
 **Missing**:
 
-- Instructor dashboard page
 - Course creation/editing UI
 - Student analytics view
 
@@ -233,6 +238,7 @@ Course
 | `/instructor/courses/<id>/readiness/` | GET  | Itemized publish-readiness report (spec 007) |
 | `/instructor/courses/<id>/publish/`   | POST | Publish, gated on readiness; 400 lists blockers |
 | `/instructor/courses/<id>/unpublish/` | POST | Unpublish; ungated, enrolled students keep access |
+| `/instructor/dashboard/` | GET | Instructor dashboard snapshot (spec 008) |
 | `/admin/courses/`      | CRUD   | All courses (admin)       |
 
 | Corresponding `/sections/`, `/lectures/`, `/quizzes/` endpoints exist for each role
