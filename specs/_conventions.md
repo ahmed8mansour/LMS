@@ -903,3 +903,35 @@ Patterns introduced by `007-course-publishing` that later specs should reuse rat
   without a client mapping is a `tsc` error rather than a silent gap (see `readinessHref`).
 - **Running tests**: pass module labels — `manage.py test apps.course.tests_publishing` — not `apps.course`.
   `backend/apps/` has no `__init__.py`, so unittest discovery cannot resolve the package label.
+
+---
+
+## Instructor Dashboard (spec 008)
+
+Patterns introduced by `008-instructor-dashboard` that later read-heavy specs (009 analytics, 010 roster,
+013 earnings) should reuse:
+
+- **Snapshot endpoints are all-or-nothing**: build the complete DTO first, then serialize inside the same
+  `try` as the build. On any failure return one `500 {"error": ...}` and never a partial response
+  (`InstructorDashboardView`).
+- **Cross-course reads use an `APIView` that takes no ids**: when there is no single owning row, scope every
+  query to `request.user.instructor_profile` inside a service that accepts only the profile. A missing
+  profile is `403 {"error", "code": "no_instructor_profile"}`, not 401 (the caller is authenticated).
+- **Denormalized counters count enrollments, not people**: `InstructorProfile.students_count` and
+  `Course.subscribers_count` go up once per enrollment. For people, use
+  `Enrollment ... Count('user', distinct=True)` with `is_active=True`.
+- **One reverse-relation `Count` per query**: a second annotation joins another table and multiplies both.
+  Split extra aggregates into their own `.aggregate()` queries.
+- **Roll-ups reuse readiness blocker codes**: to find courses with failed videos, read the
+  `lecture_video_failed` blockers on the 007 `ReadinessReport` rather than re-querying lectures. Readiness
+  stays the one definition.
+- **Pin the query count**: a service that loops over courses gets a test asserting the same query count for
+  1 and 10 courses (`CaptureQueriesContext`).
+- **Pages that depend on many mutations don't use invalidation**: use
+  `staleTime: 0, gcTime: 0, refetchOnMount: 'always'` so each visit fetches fresh data, instead of adding the
+  page's key to every mutation hook.
+- **Parse snapshot responses with Zod in the API function**: a malformed payload throws and becomes the
+  error state, rather than rendering missing numbers as `0` or an empty list as "all caught up". Infer the TS
+  types from the schema.
+- **Money on the wire is a 2-decimal string** (`"8940.00"`) plus a currency code; format it on the client
+  with `Intl.NumberFormat`, in full, never compact.

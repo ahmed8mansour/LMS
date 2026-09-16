@@ -46,6 +46,7 @@ from apps.enrollment.models import Enrollment
 from .video.service import (
     VideoUploadService, VideoWebhookService, VideoLifecycleService, VideoAssetError,
 )
+from .dashboard import InstructorDashboardService
 # Create your views here.
 
 logger = logging.getLogger(__name__)
@@ -628,3 +629,41 @@ class VideoWebhookView(APIView):
             return Response({'error': 'Invalid webhook signature'}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response({'message': 'ok'}, status=status.HTTP_200_OK)
+
+
+
+class InstructorDashboardView(APIView):
+    # An APIView, not an @action on InstructorCourseViewSet: the dashboard spans all of
+    # an instructor's courses, so there is no single owning row for get_object() to
+    # scope. Ownership comes from the session's profile, which is the only input the
+    # service accepts — this endpoint reads no ids (spec 008 research R2, R8).
+    authentication_classes = [CookieJWTAuthentication]
+    permission_classes = [IsAuthenticated, isInstructor]
+    # Class-level scope is correct here (unlike the viewset in 007): this view has one
+    # action, and it is the heaviest instructor read (research R10).
+    throttle_scope = 'instructor_dashboard'
+
+    def get(self, request):
+        try:
+            profile = request.user.instructor_profile
+        except InstructorProfile.DoesNotExist:
+            # 403, not 401: the caller is authenticated. The additive `code` lets the
+            # client show a handled state instead of a retryable error (FR-032).
+            return Response(
+                {'error': 'No instructor profile is associated with this account.', 'code': 'no_instructor_profile'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # Build AND serialize inside one try: the snapshot is all-or-nothing, so a
+        # failure in any section — readiness included — returns a single error and
+        # never a partial response (FR-027, FR-028).
+        try:
+            data = InstructorDashboardService().build(profile).to_dict()
+        except Exception:
+            logger.exception('Instructor dashboard snapshot failed for profile %s', profile.id)
+            return Response(
+                {'error': "We couldn't load your dashboard. Please try again."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        return Response(data, status=status.HTTP_200_OK)
