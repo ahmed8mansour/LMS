@@ -178,11 +178,13 @@ Course
 ### 2. Instructor Dashboard
 
 **Status**: Partially implemented
-**Current**: Instructor APIs exist (course/section/lecture/quiz CRUD); the dashboard page is done (spec 008)
+**Current**: Instructor APIs exist (course/section/lecture/quiz CRUD); the dashboard page is done (spec 008);
+per-course and aggregate analytics are done (spec 009) — `GET /courses/instructor/courses/{id}/analytics/`
+and `GET /courses/instructor/analytics/`, both with `?days=30|90|all`
 **Missing**:
 
 - Course creation/editing UI
-- Student analytics view
+- Student roster (spec 010), instructor profile editing (011), reviews feed (012), earnings (013)
 
 ### 3. Cart/Wishlist
 

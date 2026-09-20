@@ -3,7 +3,7 @@ from .views import  AdminCourseViewSet , AdminLectureViewSet , AdminSectionViewS
 from .views import InstructorCourseViewSet , InstructorLectureViewSet , InstructorSectionViewSet , InstructorQuizViewSet
 from .views import InstructorQuestionViewSet , InstructorChoiceViewSet
 from .views import StudentCourseViewSet , StudentSectionViewSet , StudentLectureViewSet , StudentQuizViewSet , StudentCourseView
-from .views import VideoUploadSignatureView, VideoWebhookView, VideoDeleteView, VideoConfirmView , InstructorDashboardView
+from .views import VideoUploadSignatureView, VideoWebhookView, VideoDeleteView, VideoConfirmView , InstructorDashboardView , InstructorAnalyticsView
 from rest_framework.routers import DefaultRouter
 
 router = DefaultRouter()
@@ -39,6 +39,7 @@ urlpatterns = [
     path('video/<int:lecture_id>/', VideoDeleteView.as_view(), name='video_delete'),
     path('video/<int:lecture_id>/confirm/', VideoConfirmView.as_view(), name='video_confirm'),
     path('instructor/dashboard/', InstructorDashboardView.as_view(), name='instructor_dashboard'),
+    path('instructor/analytics/', InstructorAnalyticsView.as_view(), name='instructor_analytics'),
 ]
 
 
