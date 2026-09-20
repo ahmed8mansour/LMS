@@ -35,6 +35,7 @@ from rest_framework.decorators import action
 from rest_framework.throttling import ScopedRateThrottle
 
 from .publishing import READINESS_PREFETCH, CoursePublishingService, PublishReadinessService
+from .analytics import CourseAnalyticsService, InvalidPeriod, parse_period
 
 from rest_framework.serializers import ValidationError
 from rest_framework.exceptions import NotFound, PermissionDenied
@@ -114,7 +115,38 @@ class InstructorCourseViewSet(ModelViewSet):
         if self.action in ('publish', 'unpublish'):
             self.throttle_scope = 'course_publish'
             return [ScopedRateThrottle()]
+        if self.action == 'analytics':
+            self.throttle_scope = 'instructor_analytics'
+            return [ScopedRateThrottle()]
         return super().get_throttles()
+
+    # ---- Analytics (spec 009) -------------------------------------------------
+
+    @action(detail=True, methods=['get'])
+    def analytics(self, request, pk=None):
+        # get_object() IS the ownership check: another instructor's course, a missing
+        # course, and a caller without an instructor profile (empty queryset) all 404
+        # here, identically, before any analytics code runs (FR-026).
+        course = self.get_object()
+
+        try:
+            period = parse_period(request.query_params.get('days'))
+        except InvalidPeriod:
+            return Response(
+                {'error': 'days must be one of 30, 90, all.', 'code': 'invalid_period'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Build AND serialize inside one try: all-or-nothing, never a partial body (FR-022).
+        try:
+            data = CourseAnalyticsService().build([course], period, 'course').to_dict()
+        except Exception:
+            logger.exception('Course analytics failed for course %s', course.id)
+            return Response(
+                {'error': "We couldn't load analytics. Please try again."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+        return Response(data, status=status.HTTP_200_OK)
 
     # ---- Publishing (spec 007) ------------------------------------------------
     # Each action resolves the course through self.get_object(), i.e. inside
@@ -666,4 +698,44 @@ class InstructorDashboardView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
+        return Response(data, status=status.HTTP_200_OK)
+
+
+class InstructorAnalyticsView(APIView):
+    # An APIView, not an @action: the aggregate spans all of an instructor's courses,
+    # so there is no single owning row for get_object() to scope. Ownership comes from
+    # the session's profile; this endpoint reads no ids from the client (FR-025,
+    # spec 009 research R1).
+    authentication_classes = [CookieJWTAuthentication]
+    permission_classes = [IsAuthenticated, isInstructor]
+    throttle_scope = 'instructor_analytics'
+
+    def get(self, request):
+        try:
+            profile = request.user.instructor_profile
+        except InstructorProfile.DoesNotExist:
+            return Response(
+                {'error': 'No instructor profile is associated with this account.', 'code': 'no_instructor_profile'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        try:
+            period = parse_period(request.query_params.get('days'))
+        except InvalidPeriod:
+            return Response(
+                {'error': 'days must be one of 30, 90, all.', 'code': 'invalid_period'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # The only ownership filter: every later query is scoped to these course ids.
+        courses = list(Course.objects.filter(instructor=profile).only('id', 'title'))
+
+        try:
+            data = CourseAnalyticsService().build(courses, period, 'instructor').to_dict()
+        except Exception:
+            logger.exception('Instructor analytics failed for profile %s', profile.id)
+            return Response(
+                {'error': "We couldn't load analytics. Please try again."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
         return Response(data, status=status.HTTP_200_OK)

@@ -157,6 +157,9 @@ REST_FRAMEWORK = {
         # The heaviest instructor read (readiness over every course plus aggregates).
         # A ceiling against a runaway client loop, not a security boundary.
         'instructor_dashboard': '60/min',
+        # The heaviest period-parameterised instructor read (analytics, spec 009).
+        # A ceiling against a runaway client loop, not a security boundary.
+        'instructor_analytics': '60/min',
     },
 }
 

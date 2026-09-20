@@ -1,10 +1,12 @@
-import { ComingSoon } from "@/components/molecules/ComingSoon";
+import { Suspense } from "react";
+import { AnalyticsSkeleton, InstructorAnalytics } from "@/featuers/instructor-analytics";
 
+// The page reads ?days= through useSearchParams, which Next 16 requires to sit under a
+// Suspense boundary.
 export default function InstructorAnalyticsPage() {
     return (
-        <ComingSoon
-            title="Analytics"
-            description="Enrollments, completion, and quiz performance across your courses. This is coming soon."
-        />
+        <Suspense fallback={<AnalyticsSkeleton />}>
+            <InstructorAnalytics />
+        </Suspense>
     );
 }

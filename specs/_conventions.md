@@ -935,3 +935,42 @@ Patterns introduced by `008-instructor-dashboard` that later read-heavy specs (0
   types from the schema.
 - **Money on the wire is a 2-decimal string** (`"8940.00"`) plus a currency code; format it on the client
   with `Intl.NumberFormat`, in full, never compact.
+
+---
+
+## Instructor Analytics (spec 009)
+
+Patterns introduced by `009-instructor-analytics` for period-parameterised reads:
+
+- **Definitions live in pure modules**: `backend/apps/course/analytics/periods.py` and `metrics.py` import no
+  ORM. `service.py` turns rows into plain shapes (`CourseShape`, `StudentCourseProgress`) and hands them
+  over, so every rule gets a fast, database-free test. Rules that changed during clarification belong here,
+  never inline in a view or a queryset.
+- **One computation, two scopes**: `CourseAnalyticsService.build(courses, period, scope)` takes a *list* of
+  courses. The per-course endpoint passes `[course]`, the aggregate passes every owned course. Pooling is
+  then just summing, and the two views can't drift apart.
+- **The cohort is a (student, course) pair**, not a student: a student who enrolled in one course this month
+  and another last year contributes only the first to a 30-day period. Grouped rows are matched back to
+  pairs in Python.
+- **Join StudentProfile-keyed progress to CustomUser-keyed enrollments with `user__user_id`**:
+  `Enrollment.user` is a `CustomUser` while `LectureProgress`/`QuizAttempt` point at `StudentProfile`. One
+  lookup path, no per-student queries.
+- **Group progress per section, not per lecture**: rows stay bounded by students × sections, and
+  `unique_together (user, lecture)` makes `Count('id')` an exact completed-lecture count. Quiz attempts group
+  per (student, quiz), so retakes collapse in the database.
+- **Analytics completion is stricter than review eligibility**: every current lecture **and** every current
+  quiz. Section completion reuses the student-side unlock rule, and a test asserts the two agree with
+  `apps.progress.utils.is_section_unlocked`.
+- **Strict API, forgiving UI**: an unknown `?days=` is `400 {"error", "code": "invalid_period"}`; the page
+  silently falls back to 30 days. A typo can never look like real data.
+- **Windows and buckets are UTC and day-aligned**: "Last 30 days" is the 30 UTC days ending today, so the
+  chart has 30 comparable points and every viewer sees the same buckets.
+- **The selected period lives in the page address** (`?days=`), set with `router.replace(..., { scroll: false })`
+  so three clicks don't leave three history entries while refresh, Back and shared links keep it.
+- **Charts are Recharts, confined to one module**: colours come from the Tailwind tokens via
+  `var(--color-darkmint)` / `var(--color-graytext2)` (never a raw hex), every chart sits in a
+  `ResponsiveContainer` with `accessibilityLayer`, and drop-off uses horizontal bars so long titles get a
+  row each. A clickable bar always has a keyboard-reachable link beside it.
+- **Percentages are computed on the client from the counts**, never from the rounded rate on the wire, so
+  "71% · 36 of 51" can't disagree with itself. A rate with no denominator is `null` on the wire and a worded
+  empty state in the UI — never `0%`.
