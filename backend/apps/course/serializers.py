@@ -1,3 +1,5 @@
+from datetime import timezone as dt_timezone
+
 from rest_framework import serializers
 from .models import Course , Section ,Lecture , Quiz , Question , Choice
 from apps.authentication.models import CustomUser
@@ -10,9 +12,11 @@ from rest_framework import status
 from django.forms.models import model_to_dict
 
 from apps.authentication.serializers import UserDataSerializer
+from apps.enrollment.models import Enrollment
 from .video.factory import get_video_provider
 from .video.access import can_access_lecture_video
 from .publishing import PublishReadinessService
+from .dashboard.service import person_name
 
 class LectureSerializer(serializers.ModelSerializer):
     video_url = serializers.SerializerMethodField()
@@ -223,3 +227,57 @@ class InstructorCourseSerializer(serializers.ModelSerializer):
         self._readiness = PublishReadinessService().evaluate(instance)
         return super().to_representation(instance)
 
+
+
+class RosterCourseSerializer(serializers.ModelSerializer):
+    """The course a roster row belongs to. Same shape as 008's CourseRef."""
+
+    class Meta:
+        model = Course
+        fields = ['id', 'title']
+
+
+class InstructorStudentSerializer(serializers.ModelSerializer):
+    """One row of the instructor student roster (spec 010).
+
+    Nothing may be added to `fields`. FR-033 and SC-005 restrict a roster to the four
+    columns the instructor asked for plus the course, and RosterPrivacyTests asserts the
+    exact key set over the raw response body — so a convenient extra field here fails a
+    test rather than quietly exposing a student's email, orders or quiz results.
+    """
+
+    name = serializers.SerializerMethodField()
+    avatar = serializers.SerializerMethodField()
+    progress = serializers.SerializerMethodField()
+    enrolled_at = serializers.SerializerMethodField()
+    course = RosterCourseSerializer(read_only=True)
+
+    class Meta:
+        model = Enrollment
+        # `id` is the ENROLMENT id, not the student's. In the all-courses scope a student
+        # enrolled in two courses produces two rows, so a student id would repeat —
+        # duplicate React keys, and a client-side dedupe would silently drop a row. The
+        # enrolment is the row's real identity, and it keeps the user id out of the body.
+        fields = ['id', 'name', 'avatar', 'enrolled_at', 'progress', 'course']
+
+    def get_name(self, obj):
+        # Imported from the dashboard rather than restated, so the displayed name and its
+        # username fallback are derived in exactly one place across 008 and 010 (FR-007).
+        return person_name(obj.user)
+
+    def get_avatar(self, obj):
+        # '' and NULL both become null, so the client has one absent case to handle.
+        return obj.user.profile_picture or None
+
+    def get_enrolled_at(self, obj):
+        # A date, never a timestamp. DRF's DateField refuses a datetime outright ("Use a
+        # custom read-only field and deal with timezone issues explicitly") precisely
+        # because narrowing one silently picks a timezone — so the conversion is spelled
+        # out here: to UTC, then to a date. FR-009 names UTC, not the project timezone,
+        # so this stays correct even if settings.TIME_ZONE ever changes.
+        return obj.enrolled_at.astimezone(dt_timezone.utc).date().isoformat()
+
+    def get_progress(self, obj):
+        # .get() with no default: a pair missing from the map is None, which is the "no
+        # lectures yet" case the client renders as an em dash. Never 0 (FR-011, SC-007).
+        return self.context['progress'].get((obj.user_id, obj.course_id))
