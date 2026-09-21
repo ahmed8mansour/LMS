@@ -19,7 +19,7 @@ from django.db import transaction
 from .serializers import (
     CourseSerializer , SectionSerializer , QuizSerializer , LectureSerializer ,
     InstructorCourseSerializer , InstructorQuizSerializer , QuestionSerializer , ChoiceSerializer ,
-    InstructorSectionSerializer , InstructorLectureSerializer
+    InstructorSectionSerializer , InstructorLectureSerializer , InstructorStudentSerializer
 )
 from .models import Course , Section , Quiz , Lecture , Question , Choice
 from .reorder import reorder_within_parent
@@ -40,7 +40,8 @@ from .analytics import CourseAnalyticsService, InvalidPeriod, parse_period
 from rest_framework.serializers import ValidationError
 from rest_framework.exceptions import NotFound, PermissionDenied
 from rest_framework import filters
-from .pagination import CourseCursorPagination
+from .pagination import CourseCursorPagination, StudentRosterPagination
+from .roster import build_progress_map
 
 from rest_framework.generics import ListAPIView
 from apps.enrollment.models import Enrollment
@@ -739,3 +740,120 @@ class InstructorAnalyticsView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
         return Response(data, status=status.HTTP_200_OK)
+
+
+class InstructorStudentsView(ListAPIView):
+    """The instructor student roster (spec 010).
+
+    One endpoint, two scopes: with `?course=<id>` it is a single course's roster (the
+    workspace Students tab), without it every course the caller owns (the sidebar
+    Students page). A ListAPIView, not a ReadOnlyModelViewSet — there is no `retrieve`
+    (a per-student view is out of scope), and this is the only base class that gives
+    PageNumberPagination and SearchFilter for free, which is why both were chosen.
+
+    GET /courses/instructor/students/?course=&search=&page=
+    """
+
+    authentication_classes = [CookieJWTAuthentication]
+    permission_classes = [IsAuthenticated, isInstructor]
+    # Driven by a debounced search box, so burstier than the other instructor reads.
+    # A ceiling against a runaway client loop; ownership is the security boundary.
+    throttle_scope = 'instructor_students'
+    serializer_class = InstructorStudentSerializer
+    pagination_class = StudentRosterPagination
+
+    # Everything FR-015 and FR-017 ask for comes from this configuration alone:
+    # SearchFilter splits the term on whitespace and ANDs the parts, ORing each across
+    # the fields, so "maria gomez" matches first_name AND last_name with no concatenated
+    # annotation; a field with no prefix uses icontains, giving partial and
+    # case-insensitive matching; Django escapes % and _ so they match literally; and a
+    # whitespace-only term yields no terms at all, making it a no-op. Enrollment.user is
+    # a to-one FK, so the join cannot fan out and no .distinct() is needed.
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['user__first_name', 'user__last_name', 'user__username']
+
+    def _resolve_owned_course(self, raw):
+        """`?course=` resolved against the caller's own courses, or None.
+
+        Every failure mode returns None so that list() answers all of them with one
+        identical 404: another instructor's course, a course that does not exist, and an
+        unparseable id. A different response for any of them would turn this endpoint
+        into a probe for which course ids exist (FR-032).
+
+        The int() parse is the part that is easy to leave out. Without it, `?course=abc`
+        reaches the ORM and raises ValueError -> 500, which is itself a distinguishing
+        signal.
+        """
+        try:
+            course_id = int(raw)
+        except (TypeError, ValueError):
+            return None
+        if course_id < 1:
+            return None
+        return Course.objects.filter(instructor=self._profile, id=course_id).first()
+
+    def get_queryset(self):
+        # Built from ownership OUTWARD, so scoping is a filter rather than a check
+        # someone can forget. A course id from the client never widens this — it can
+        # only narrow it, and only after list() has resolved it against the owned set.
+        queryset = Enrollment.objects.filter(
+            course__instructor=self._profile,
+            is_active=True,
+        )
+        if self._course is not None:
+            queryset = queryset.filter(course=self._course)
+
+        return (
+            queryset
+            # Keeps name, avatar and course title off the N+1 path.
+            .select_related('user', 'course')
+            # The '-id' is not cosmetic. enrolled_at is auto_now_add, and a free-enrolment
+            # batch or a webhook burst writes identical timestamps; with '-enrolled_at'
+            # alone the order among tied rows is unspecified, so pages can repeat AND
+            # skip students with no writes happening at all. This makes the sort total.
+            .order_by('-enrolled_at', '-id')
+        )
+
+    def list(self, request, *args, **kwargs):
+        try:
+            self._profile = request.user.instructor_profile
+        except InstructorProfile.DoesNotExist:
+            # A staff account that passed isInstructor but has no profile. Refused
+            # explicitly rather than served an empty page: an empty roster already means
+            # "you have no students yet", and a broken account must not look like a new
+            # instructor (FR-029, FR-034). Same shape as 009, so the client's existing
+            # no-profile state handles it.
+            return Response(
+                {'error': 'No instructor profile is associated with this account.',
+                 'code': 'no_instructor_profile'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        self._course = None
+        raw_course = request.query_params.get('course')
+        if raw_course is not None:
+            self._course = self._resolve_owned_course(raw_course)
+            if self._course is None:
+                return Response(
+                    {'error': 'Course not found.'},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+        queryset = self.filter_queryset(self.get_queryset())
+        # Outside the catch-all below on purpose: a NotFound raised here is a genuine
+        # 404, and must not be reported as a server error.
+        page = self.paginate_queryset(queryset)
+
+        try:
+            # Progress is computed for the page, AFTER pagination — never in the
+            # queryset. Nothing sorts or filters by it, so it never needs to be in SQL;
+            # this is what keeps a roster request at four queries (roster.py, research R7).
+            context = {**self.get_serializer_context(), 'progress': build_progress_map(page)}
+            serializer = self.get_serializer(page, many=True, context=context)
+            return self.get_paginated_response(serializer.data)
+        except Exception:
+            logger.exception('Student roster failed for profile %s', self._profile.id)
+            return Response(
+                {'error': "We couldn't load the students. Please try again."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )

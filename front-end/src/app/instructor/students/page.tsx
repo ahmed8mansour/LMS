@@ -1,10 +1,12 @@
-import { ComingSoon } from "@/components/molecules/ComingSoon";
+import { Suspense } from "react";
+import { InstructorStudents, RosterSkeleton } from "@/featuers/instructor-students";
 
+// The page reads ?search= and ?page= through useSearchParams, which Next 16 requires to
+// sit under a Suspense boundary.
 export default function InstructorStudentsPage() {
     return (
-        <ComingSoon
-            title="Students"
-            description="See who is enrolled in your courses and their progress. This is coming soon."
-        />
+        <Suspense fallback={<RosterSkeleton />}>
+            <InstructorStudents />
+        </Suspense>
     );
 }

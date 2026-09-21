@@ -974,3 +974,129 @@ Patterns introduced by `009-instructor-analytics` for period-parameterised reads
 - **Percentages are computed on the client from the counts**, never from the rounded rate on the wire, so
   "71% · 36 of 51" can't disagree with itself. A rate with no denominator is `null` on the wire and a worded
   empty state in the UI — never `0%`.
+
+---
+
+## Student Roster, Tables & Numbered Paging (spec 010)
+
+### Cursor or page-number?
+
+Both exist in this project, and the choice follows from the UI, not from taste:
+
+- **Cursor** (`CourseCursorPagination`) for infinite scroll. No total, so no "of 318".
+- **Page-number** (`StudentRosterPagination`, `ReviewPageNumberPagination`,
+  `BillingPageNumberPagination`) whenever the control shows numbered pages or a position
+  like "21–40 of 318" — that label needs `count`, which cursor pagination cannot give.
+
+Page-number paging drifts under concurrent writes (a new row at the top shifts everything
+down, so the last row of page 1 reappears on page 2). That is the accepted price of
+numbered pages; don't try to fix it with a cursor unless you also drop the total.
+
+### Any paginated list needs a total ordering
+
+```python
+.order_by('-enrolled_at', '-id')   # NOT just '-enrolled_at'
+```
+
+`auto_now_add` timestamps collide — batch enrolments, webhook bursts — and Postgres leaves
+tied rows in an unspecified order. With a partial sort, pages **repeat and skip rows with
+no writes happening at all**, and it fails intermittently, so it survives casual testing.
+Always add a unique tiebreak (`-id`) to a paginated `order_by`.
+
+### DRF 404s an out-of-range page
+
+`PageNumberPagination` raises `NotFound` for `?page=999` and `?page=abc`. If the product
+wants a silent fall back to the first page, override **`get_page_number()`** — not
+`paginate_queryset` — because `request.query_params` is an immutable `QueryDict` and the
+page cannot be rewritten once `NotFound` has been raised. Return `paginator.num_pages` for
+`last_page_strings`, never the literal string: `Paginator` calls `int()` on it.
+
+### Derived per-row values: paginate first
+
+If nothing sorts or filters by a derived column, it does **not** belong in the queryset.
+Let DRF paginate, then compute the visible rows in a couple of grouped queries and pass
+the result through serializer context:
+
+```python
+def list(self, request, *args, **kwargs):
+    queryset = self.filter_queryset(self.get_queryset())
+    page = self.paginate_queryset(queryset)
+    context = {**self.get_serializer_context(), 'progress': build_progress_map(page)}
+    serializer = self.get_serializer(page, many=True, context=context)
+    return self.get_paginated_response(serializer.data)
+```
+
+This avoids both the per-row `SerializerMethodField` (~40 queries a page) and correlated
+`Subquery` annotations, and it is the plainer code. See `apps/course/roster.py`.
+
+### Name search comes free from `SearchFilter`
+
+```python
+filter_backends = [filters.SearchFilter]
+search_fields = ['user__first_name', 'user__last_name', 'user__username']
+```
+
+`SearchFilter` splits the term on whitespace and **ANDs** the parts, ORing each across the
+fields — so `"maria gomez"` matches first name *and* last name with no concatenated
+annotation. A field with no prefix uses `icontains` (partial, case-insensitive), Django
+escapes `%` and `_`, and a whitespace-only term yields no terms and is a no-op. A to-one
+FK join cannot fan out, so no `.distinct()`. Test these anyway: none of them are visible
+in the view's own code.
+
+### Narrowing a datetime to a date
+
+`serializers.DateField()` **refuses** a `datetime` — it asserts, telling you to use a
+custom read-only field and handle the timezone explicitly. Do that, and spell out the
+conversion, so the guarantee doesn't depend on `settings.TIME_ZONE`:
+
+```python
+return obj.enrolled_at.astimezone(dt_timezone.utc).date().isoformat()
+```
+
+On the client, **never** `new Date("2026-07-02")` — it parses as UTC midnight, so
+`.toLocaleDateString()` shows the previous day west of Greenwich. Format by splitting the
+string.
+
+### Ownership-scoped reads
+
+Build the queryset from the session profile outward, so scoping is a filter rather than a
+check someone can forget:
+
+```python
+Enrollment.objects.filter(course__instructor=profile, is_active=True)
+```
+
+A client-supplied id may only *narrow* that, and only after being resolved against the
+owned set. Every failure — someone else's id, a missing id, `abc`, `0`, `-1` — must return
+the **same** 404 body, or the endpoint becomes a probe for which ids exist. Parse the id
+with `int()` explicitly: without it, `?course=abc` reaches the ORM, raises `ValueError`,
+and becomes a `500` that is itself a distinguishing signal.
+
+A caller with no `InstructorProfile` gets a handled `403` with
+`code: 'no_instructor_profile'` (008's body, and the client's `NoInstructorProfileState`
+renders it) — not an empty page, which would be indistinguishable from having no data yet.
+
+### The shared table stack
+
+- **`components/atoms/table.tsx`** — shadcn's table, restyled onto the house tokens
+  (`graytext/20` borders, `graytext2` uppercase headers, `lightbg` hover,
+  `darkmint/5` selection). It sets **no background**; the wrapping card owns the surface.
+  shadcn primitives live in `atoms/`, never in `components/ui/`, whatever
+  `components.json` aliases.
+- **`components/molecules/RosterPagination.tsx`** — numbered paging. Props carry no
+  feature vocabulary, so 012 and 013 can reuse it. Position comes from `count`; disabled
+  states come from the server's `next`/`previous` being null, never from arithmetic.
+- A four-column table does not fit 375px. Render a real `<table>` at `md` and up and a
+  card list below it, rather than allowing horizontal page scroll.
+
+### Search box + URL params
+
+Keep the input on **local state**, debounce it (300 ms, `hooks/useDebounce`), then write
+the term to the address. If the input reads its value back from `useSearchParams`, every
+keystroke round-trips through the router and typing feels laggy.
+
+Write the term and reset the page in **one** `router.replace`. Two writes fire a request
+for page 5 of a result set that may now have one page.
+
+Do **not** use `placeholderData: keepPreviousData` on a paged list whose spec forbids
+showing stale rows as the new result — show the skeleton instead.

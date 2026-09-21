@@ -1,8 +1,13 @@
 "use client"
 import { useEffect, useState } from 'react';
 
-export default function useDebounce(value:any , delay:number) {
-    const [debouncedValue, setDebouncedValue] = useState(value);
+/**
+ * Generic, so the debounced value keeps its type instead of widening to `any` and
+ * leaking into whatever consumes it — a query key, in the roster's case (spec 010,
+ * Constitution I).
+ */
+export default function useDebounce<T>(value: T, delay: number): T {
+    const [debouncedValue, setDebouncedValue] = useState<T>(value);
 
     useEffect(()=>{
 
@@ -14,7 +19,7 @@ export default function useDebounce(value:any , delay:number) {
 
         // open/close  >> clear the timeout
         return () => clearTimeout(handler)
-    
+
     },[value , delay])
 
     return debouncedValue

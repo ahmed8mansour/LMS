@@ -160,6 +160,11 @@ REST_FRAMEWORK = {
         # The heaviest period-parameterised instructor read (analytics, spec 009).
         # A ceiling against a runaway client loop, not a security boundary.
         'instructor_analytics': '60/min',
+        # The roster (spec 010) is driven by a debounced search box, so its traffic is
+        # burstier than the dashboard's or analytics' — hence 120, not 60. Still a
+        # ceiling against a runaway client loop, not a security boundary: ownership is
+        # the boundary, enforced by the queryset.
+        'instructor_students': '120/min',
     },
 }
 

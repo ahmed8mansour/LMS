@@ -44,7 +44,7 @@ class InstructorDashboardService:
         courses = _load_courses(profile)
         return DashboardSnapshot(
             mode='onboarding' if not courses else 'full',
-            instructor_name=_person_name(profile.user),
+            instructor_name=person_name(profile.user),
             courses=self._course_counts(courses),
             students=self._student_counts(profile),
             rating=self._rating(profile),
@@ -194,10 +194,13 @@ def _load_courses(profile: InstructorProfile) -> list[Course]:
     return list(courses_queryset)
 
 
-def _person_name(user: CustomUser) -> str:
+def person_name(user: CustomUser) -> str:
+    # Public, not _private: the roster (spec 010) imports this so a student's displayed
+    # name is derived in exactly one place. If the fallback changes, both surfaces change
+    # together (008 FR-012, 010 FR-007).
     return f"{user.first_name} {user.last_name}".strip() or user.username
 
 
 def _person_ref(user: CustomUser) -> PersonRef:
     # Never read user.email: the dashboard exposes no contact details (FR-012).
-    return PersonRef(name=_person_name(user), avatar=user.profile_picture or None)
+    return PersonRef(name=person_name(user), avatar=user.profile_picture or None)
