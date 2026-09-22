@@ -180,11 +180,15 @@ Course
 **Status**: Partially implemented
 **Current**: Instructor APIs exist (course/section/lecture/quiz CRUD); the dashboard page is done (spec 008);
 per-course and aggregate analytics are done (spec 009) — `GET /courses/instructor/courses/{id}/analytics/`
-and `GET /courses/instructor/analytics/`, both with `?days=30|90|all`
+and `GET /courses/instructor/analytics/`, both with `?days=30|90|all`; the student roster is done (spec 010)
+— `GET /courses/instructor/students/?course=&search=&page=`; the read-only reviews feed is done (spec 012)
+— `GET /reviews/instructor/reviews/?course=&rating=&page=`, serving both the workspace Reviews tab and the
+sidebar Reviews page
 **Missing**:
 
 - Course creation/editing UI
-- Student roster (spec 010), instructor profile editing (011), reviews feed (012), earnings (013)
+- Instructor profile editing (spec 011), earnings (spec 013 — the last `ComingSoon` page under
+  `/instructor`)
 
 ### 3. Cart/Wishlist
 
@@ -268,6 +272,7 @@ and `GET /courses/instructor/analytics/`, both with `?days=30|90|all`
 | Endpoint                         | Description                          |
 | -------------------------------- | ------------------------------------ |
 | `/course/<id>/reviews/`          | Public course reviews (paginated)    |
+| `/instructor/reviews/`           | Instructor feed: rating summary + reviews across owned courses, or one course via `?course=`; `?rating=5\|4` filters the list only (spec 012) |
 | `/my-review/<course_id>/`        | Student's own review (GET/POST/PATCH/DELETE) |
 | `/eligibility/<course_id>/`      | Check review eligibility             |
 | `/admin/remove/<review_id>/`     | Admin review removal                 |

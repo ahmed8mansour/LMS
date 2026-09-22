@@ -121,7 +121,7 @@ class InstructorDashboardService:
             RecentEnrollment(
                 id=enrollment.id,
                 enrolled_at=enrollment.enrolled_at,
-                student=_person_ref(enrollment.user),
+                student=person_ref(enrollment.user),
                 course=CourseRef(id=enrollment.course.id, title=enrollment.course.title),
             )
             for enrollment in enrollments
@@ -143,7 +143,7 @@ class InstructorDashboardService:
                 rating=item.rating,
                 comment=item.comment or '',
                 created_at=item.created_at,
-                reviewer=_person_ref(item.user.user),
+                reviewer=person_ref(item.user.user),
                 course=CourseRef(id=item.course.id, title=item.course.title),
             )
             for item in reviews
@@ -201,6 +201,6 @@ def person_name(user: CustomUser) -> str:
     return f"{user.first_name} {user.last_name}".strip() or user.username
 
 
-def _person_ref(user: CustomUser) -> PersonRef:
+def person_ref(user: CustomUser) -> PersonRef:
     # Never read user.email: the dashboard exposes no contact details (FR-012).
     return PersonRef(name=person_name(user), avatar=user.profile_picture or None)
