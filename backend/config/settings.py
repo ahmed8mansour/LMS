@@ -165,6 +165,12 @@ REST_FRAMEWORK = {
         # ceiling against a runaway client loop, not a security boundary: ownership is
         # the boundary, enforced by the queryset.
         'instructor_students': '120/min',
+        # The reviews feed (spec 012) is driven by filter chips and page arrows, not a
+        # debounced search box, so its traffic is not bursty — hence 60, matching the
+        # dashboard and analytics rather than the roster. Still a ceiling against a
+        # runaway client loop, not a security boundary: ownership is the boundary,
+        # enforced by the queryset.
+        'instructor_reviews': '60/min',
     },
 }
 

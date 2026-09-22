@@ -8,11 +8,13 @@ Instructor dashboard: one read-only snapshot of an instructor's business (spec 0
 Import from here, not from the submodules.
 """
 from .dto import AttentionItem, AttentionType, DashboardSnapshot
-from .service import InstructorDashboardService
+from .service import InstructorDashboardService , person_name , person_ref
 
 __all__ = [
     'AttentionItem',
     'AttentionType',
     'DashboardSnapshot',
     'InstructorDashboardService',
+    'person_name',
+    'person_ref',
 ]
