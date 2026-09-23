@@ -24,6 +24,17 @@ export const roleHomePath = (role: RoutingRole = readRoutingRole()): string => {
     return "/dashboard";
 };
 
+/**
+ * Account settings live under both shells. Linking to the student path from shared
+ * components sent instructors to /dashboard/settings/..., which proxy.ts bounced
+ * straight back to /instructor — so the link never reached its destination.
+ */
+export const settingsProfilePath = (role: RoutingRole = readRoutingRole()): string =>
+    role === "instructor" ? "/instructor/settings/profile" : "/dashboard/settings/profile";
+
+export const settingsSecurityPath = (role: RoutingRole = readRoutingRole()): string =>
+    role === "instructor" ? "/instructor/settings/security" : "/dashboard/settings/security";
+
 
 export const getCookies =  (TOKEN_KEY:string) =>  Cookies.get(TOKEN_KEY)
 

@@ -34,6 +34,15 @@ class InstructorProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = InstructorProfile
         exclude=['id' ,'user']
+        # students_count is maintained by FulfillmentFacade on enrollment/refund and is
+        # shown publicly -- it must never be writable from the profile update endpoint.
+        read_only_fields = ['students_count']
+        # title/about render on public course pages; cap `about` so a long bio cannot
+        # blow out the course detail layout. Both stay optional (model is blank=True).
+        extra_kwargs = {
+            'title': {'allow_blank': True, 'required': False},
+            'about': {'allow_blank': True, 'required': False, 'max_length': 1000},
+        }
 
 
 class AdminProfileSerializer(serializers.ModelSerializer):
@@ -53,6 +62,13 @@ class UserDataSerializer(serializers.ModelSerializer):
         extra_kwargs = {
             'password': {'write_only': True}
         }
+        # Identity and account-state fields are owned by the auth flows (register, OTP
+        # verification, login). The profile update endpoint writes through this
+        # serializer and must not be able to change any of them.
+        read_only_fields = [
+            'role', 'email', 'username', 'is_active',
+            'is_email_verified', 'date_joined', 'last_login',
+        ]
     
     def get_has_usable_password(self , obj):
         return obj.has_usable_password()
@@ -60,7 +76,8 @@ class UserDataSerializer(serializers.ModelSerializer):
 
 
     def get_specific_data(self, obj):
-        """Return the appropriate profile based on user role"""
+        """Return the appropriate profile based on user role. Read-only:
+        this runs on every representation, including public course/progress payloads."""
         if obj.role == 'student':
             try:
                 profile = StudentProfile.objects.get(user=obj)

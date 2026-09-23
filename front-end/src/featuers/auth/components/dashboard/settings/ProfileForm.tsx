@@ -9,32 +9,36 @@ import { useProfile } from '@/featuers/auth/hooks/useProfile'
 import {useRouter} from 'next/navigation'
 import BounceLoader from '@/components/atoms/bouncing-loader'
 import { zodResolver } from "@hookform/resolvers/zod";
-import { SubmitErrorHandler, useForm } from 'react-hook-form'
+import { Resolver, useForm, useWatch } from 'react-hook-form'
 import { useUpdateProfile } from '@/featuers/auth/hooks/useUpdateProfile'
-import { UserProfileSchema , UserProfileFormData } from '@/featuers/auth/schemas/auth.schma'
+import { UserProfileSchema , InstructorProfileSchema , ProfileFormData } from '@/featuers/auth/schemas/auth.schma'
+import { getInstructorProfile } from '@/featuers/auth/types/auth.types'
 import ButtonLoading from "@/components/atoms/buttonloading";
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+
+
+const BIO_MAX_LENGTH = 1000
 
 
 export function ProfileForm() {
-    
+
     const router = useRouter()
 
 
     // get user profile logic
     const { data: user, isLoading : isFetchingUserData, isError: FetchingUserDataFailed  } = useProfile();
 
-    // specific_data is role-dependent (Record<string, unknown>), so `about` must be
-    // narrowed before it's rendered or used as a textarea value. Only the
-    // instructor profile has it; for everyone else this is ''.
-    const rawAbout = user?.specific_data?.about
-    const about = typeof rawAbout === 'string' ? rawAbout : ''
+    // Only instructors have a public bio. It is keyed off the role, never off the
+    // value: a brand-new instructor has an empty title/about and still needs the
+    // fields rendered in order to fill them in for the first time.
+    const isInstructor = user?.role === 'instructor'
+    const instructorProfile = getInstructorProfile(user)
 
 
 
 
     const {mutate:updateProfile , isPending: isUpdatingProfile  } = useUpdateProfile()
-    const onSubmit = (data:UserProfileFormData) => {
+    const onSubmit = (data:ProfileFormData) => {
         updateProfile(data, {onSuccess : () => {
             reset()
             setPreviewUrl(null)
@@ -43,22 +47,33 @@ export function ProfileForm() {
 
 
 
-    
+    // The instructor schema only adds two optional fields, so both resolvers speak
+    // the same form shape; the cast keeps one `useForm` generic for both roles.
+    const resolver = useMemo(
+        () => zodResolver(isInstructor ? InstructorProfileSchema : UserProfileSchema) as Resolver<ProfileFormData>,
+        [isInstructor],
+    )
 
 
-    const {register , handleSubmit  , setValue , reset, formState:{errors , isDirty} } = useForm<UserProfileFormData>({            
-            resolver:zodResolver(UserProfileSchema) ,   
-            mode:'onBlur',  
+    const {register , handleSubmit  , setValue , reset, control, formState:{errors , isDirty} } = useForm<ProfileFormData>({
+            resolver,
+            mode:'onBlur',
             values : {
                 profile_picture : undefined,
                 first_name : user?.first_name || '',
                 last_name : user?.last_name || '',
                 email : user?.email || '',
                 date_joined : user?.date_joined ? user.date_joined.split('T')[0] : '',
+                ...(isInstructor && {
+                    title : instructorProfile?.title || '',
+                    about : instructorProfile?.about || '',
+                }),
             }
         })
 
-    
+    // useWatch rather than watch(): the latter returns a fresh function each render,
+    // which opts the whole component out of React Compiler memoization.
+    const bioLength = useWatch({ control, name: 'about' })?.length ?? 0
 
 
 
@@ -67,22 +82,22 @@ export function ProfileForm() {
 
     const fileInputRef               = useRef<HTMLInputElement>(null)
     const [previewUrl, setPreviewUrl] = useState<string | null>(null)
-    
+
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         if (!file) return
 
-        
+
         // Update RHF state (Zod will validate on submit)
         setValue('profile_picture', e.target.files!, { shouldDirty: true, shouldValidate: true })
-        
+
         // Generate preview
         setPreviewUrl((prev) => {
             if (prev) URL.revokeObjectURL(prev)
                 return URL.createObjectURL(file)
         })
     }
-    
+
 
 
 
@@ -96,18 +111,23 @@ export function ProfileForm() {
         if (previewUrl) URL.revokeObjectURL(previewUrl)
         }
     }, [previewUrl])
-    
+
+
+    // Redirecting is a side effect, so it belongs in an effect rather than in the
+    // render path, where it warned and then carried on rendering a user-less form.
+    useEffect(() => {
+        if (!isFetchingUserData && (FetchingUserDataFailed || !user)) router.replace('/login')
+    }, [isFetchingUserData, FetchingUserDataFailed, user, router])
 
 
 
 
 
 
-
-    // guards 
+    // guards
     if(isFetchingUserData) return <div className="flex items-center justify-center py-10"><BounceLoader/></div>
-    if (FetchingUserDataFailed || !user) router.replace('/login')
-    
+    if (FetchingUserDataFailed || !user) return null
+
 
 
 
@@ -121,9 +141,9 @@ export function ProfileForm() {
                 <AvatarImage src={previewUrl || user?.profile_picture} alt="Profile Avatar" />
                 <AvatarFallback>{user?.first_name?.[0]}{user?.last_name?.[0]}</AvatarFallback>
                 </Avatar>
-                <input 
+                <input
                     ref={fileInputRef}
-                    type="file" 
+                    type="file"
                     accept="image/*"
                     className="absolute  inset-0 w-full h-full hidden cursor-pointer"
                     onChange={handleFileChange}
@@ -132,7 +152,7 @@ export function ProfileForm() {
                 <Camera className="text-white text-2xl md:text-3xl" />
                 </div>
             </div>
-            {errors?.profile_picture && 
+            {errors?.profile_picture &&
                 <div className="text-sm text-red-400 mt-1">{errors.profile_picture.message}</div>
             }
             </div>
@@ -144,14 +164,14 @@ export function ProfileForm() {
             <div className="space-y-2">
                 <Label htmlFor="first_name" >First Name</Label>
                 <Input id="first_name" type="text"  {...register('first_name')} />
-                {errors?.first_name && 
+                {errors?.first_name &&
                     <span className="text-sm text-red-400">{errors?.first_name.message}</span>
                 }
             </div>
             <div className="space-y-2">
                 <Label htmlFor="last_name">Last Name</Label>
                 <Input id="last_name" type="text"  {...register('last_name')} />
-                {errors?.last_name && 
+                {errors?.last_name &&
                     <span className="text-sm text-red-400">{errors?.last_name.message}</span>
                 }
             </div>
@@ -170,13 +190,32 @@ export function ProfileForm() {
                 </div>
             </div>
 
-            {about &&
-            
-            <div className="md:col-span-2 space-y-2">
-                <Label htmlFor="bio">Bio</Label>
-                <textarea className="w-full px-4 py-2.5 rounded-lg border border-border bg-muted focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all resize-none" id="bio" placeholder="Write a short biography about yourself..." rows={4} defaultValue={about}></textarea>
-            </div>
-            }
+            {isInstructor && (
+            <>
+                <div className="md:col-span-2 space-y-2">
+                    <Label htmlFor="title">Headline</Label>
+                    <Input id="title" type="text" placeholder="e.g. Senior Backend Engineer & Django Instructor" {...register('title')} />
+                    <p className="text-xs text-graytext2">Shown under your name on every course page.</p>
+                    {errors?.title &&
+                        <span className="text-sm text-red-400">{errors?.title.message}</span>
+                    }
+                </div>
+
+                <div className="md:col-span-2 space-y-2">
+                    <div className="flex items-center justify-between">
+                        <Label htmlFor="bio">Bio</Label>
+                        <span className={`text-xs ${bioLength > BIO_MAX_LENGTH ? 'text-red-400' : 'text-graytext2'}`}>
+                            {bioLength}/{BIO_MAX_LENGTH}
+                        </span>
+                    </div>
+                    <textarea className="w-full px-4 py-2.5 min-h-40 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all bg-lightbg text-darktext border border-graylighttext/40 placeholder:text-[#94A3B8]" id="bio" placeholder="Write a short biography about yourself..." {...register('about')}></textarea>
+                    <p className="text-xs text-graytext2">Students read this on your course pages before they enroll.</p>
+                    {errors?.about &&
+                            <span className="text-sm text-red-400">{errors?.about.message}</span>
+                    }
+                </div>
+            </>
+            )}
 
 
             </div>

@@ -10,6 +10,7 @@ import ButtonLoading from "@/components/atoms/buttonloading";
 import { FaArrowRight } from "react-icons/fa";
 import { useResetPassword } from "../../hooks/forget-password/useResetPassword";
 import { useGoogleSetPasswordReset } from "../../hooks/forget-password/useGoogleSetPasswordReset";
+import { settingsSecurityPath } from "@/lib/cookies";
 
 interface ResetPasswordFormProps {
     mode?: 'forget_password' | 'google_set_password';
@@ -31,7 +32,10 @@ export function ResetPasswordForm({ mode = 'forget_password', onSuccessPath }: R
         if (mode === 'google_set_password') {
             resetGooglePassword(payload, {
                 onSuccess() {
-                    router.replace(onSuccessPath ?? '/dashboard')
+                    // Back to the Security page the flow was started from, for whichever
+                    // shell the user belongs to — '/dashboard' bounced instructors to
+                    // /instructor and lost the context entirely.
+                    router.replace(onSuccessPath ?? settingsSecurityPath())
                 }
             })
             return

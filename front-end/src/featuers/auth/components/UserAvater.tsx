@@ -22,6 +22,7 @@ import {
 } from "lucide-react"
 import { useRouter } from "next/navigation";
 import { useLogout } from "../hooks/useLogout";
+import { roleHomePath, settingsProfilePath } from "@/lib/cookies";
 
 export function UserAvater() {
     const { data: user, isLoading : isFetchingUserData, isError: FetchingUserDataFailed  } = useProfile();
@@ -73,11 +74,14 @@ export function UserAvater() {
             <DropdownMenuContent align="end">
                 <DropdownMenuGroup>
                     
-                        <DropdownMenuItem onClick={() => router.replace('/dashboard/settings/profile')} >
+                        {/* Hardcoding the student paths here sent instructors to /dashboard/...,
+                            which proxy.ts then bounced to /instructor - so "Profile" never
+                            actually opened the profile page for them. */}
+                        <DropdownMenuItem onClick={() => router.replace(settingsProfilePath(user.role))} >
                             <BadgeCheckIcon />
                             Profile
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => router.replace('/dashboard')}>
+                        <DropdownMenuItem onClick={() => router.replace(roleHomePath(user.role))}>
                             <MdPestControl />
                             Dashboard
                         </DropdownMenuItem>

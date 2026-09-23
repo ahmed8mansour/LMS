@@ -14,14 +14,32 @@ export interface UserProfile {
     first_name: string
     last_name: string
     email: string
-    role: string
+    role: UserRole
     is_active: boolean
     is_email_verified: boolean
     date_joined: string
     has_usable_password: boolean
 }
 
-export type SpecificData = Record<string, unknown> | null
+export type UserRole = 'student' | 'instructor' | 'admin'
+
+// `specific_data` is the role-dependent profile row. Students have no extra fields,
+// instructors carry the public bio, and a staff account with no profile row gets null.
+export interface InstructorSpecificData {
+    title: string
+    about: string
+    students_count: number
+}
+
+export type StudentSpecificData = Record<string, never>
+
+export type SpecificData = InstructorSpecificData | StudentSpecificData | null
+
+// Narrowing helper: the only safe way to read title/about off a UserProfile.
+export function getInstructorProfile(user?: Pick<UserProfile, 'role' | 'specific_data'>): InstructorSpecificData | null {
+    if (!user || user.role !== 'instructor' || !user.specific_data) return null
+    return user.specific_data as InstructorSpecificData
+}
 
 
 

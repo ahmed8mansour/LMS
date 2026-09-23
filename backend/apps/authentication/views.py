@@ -18,7 +18,8 @@ from rest_framework import status
 
 from .models import CustomUser
 
-from .serializers import   GoogleLoginSerializer,GoogleRegisterSerializer, UserForgetPasswordSetnewoneSerializer ,UserForgetPasswordVerifyOTPSerializer, CustomUserRegisterSendOTPSerializer , UserDataSerializer  , UserLoginSerializer , UserSetPasswordSerializer , UserChangePasswordSerializer , UserRegisterVerifyOTPSerializer , UserResnedOTPSerializer , UserForgetPasswordSendOTPSerializer, GoogleSetPasswordSendOTPSerializer, GoogleSetPasswordVerifyOTPSerializer, GoogleSetPasswordNewPasswordSerializer
+from django.db import transaction
+from .serializers import   InstructorProfileSerializer, GoogleLoginSerializer,GoogleRegisterSerializer, UserForgetPasswordSetnewoneSerializer ,UserForgetPasswordVerifyOTPSerializer, CustomUserRegisterSendOTPSerializer , UserDataSerializer  , UserLoginSerializer , UserSetPasswordSerializer , UserChangePasswordSerializer , UserRegisterVerifyOTPSerializer , UserResnedOTPSerializer , UserForgetPasswordSendOTPSerializer, GoogleSetPasswordSendOTPSerializer, GoogleSetPasswordVerifyOTPSerializer, GoogleSetPasswordNewPasswordSerializer
 from .utils import set_jwt_cookies, clear_jwt_cookies, CookieJWTAuthentication, set_password_reset_token_cookie, clear_password_reset_token_cookie, set_role_cookie
 # Create your views here.
 import logging
@@ -209,18 +210,37 @@ class UserProfileUpdateView(APIView):
     # header:{access token}
 
     def put(self , request):
+        """Update the caller's own account fields, plus their InstructorProfile
+        (title/about) when they are an instructor. Always partial."""
         user = request.user
-        logger.debug(">>> Request received")
-        logger.debug(f">>> FILES: {request.FILES}")
-        logger.debug(f">>> DATA: {request.data}")
-        serizalizer = UserDataSerializer(instance= user , data= request.data , partial=True)
-        if serizalizer.is_valid():
-            serizalizer.save()
-            logger.debug(">>> Response sent done")
-            return Response(serizalizer.data , status=status.HTTP_200_OK)
-        logger.debug(">>> Response sent error")
-        logger.debug(f">>> {serizalizer.errors}")
-        return Response(serizalizer.errors , status= status.HTTP_400_BAD_REQUEST)
+
+        user_serializer = UserDataSerializer(instance=user, data=request.data, partial=True)
+        if not user_serializer.is_valid():
+            return Response(user_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        # The instructor bio lives on a separate row, so it is validated explicitly here
+        # rather than inside the read-only specific_data method field.
+        profile_serializer = None
+        if user.role == 'instructor':
+            profile = getattr(user, 'instructor_profile', None)
+            if profile is None:
+                return Response(
+                    {'error': 'Instructor profile not found.'},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            profile_serializer = InstructorProfileSerializer(profile, data=request.data, partial=True)
+            if not profile_serializer.is_valid():
+                return Response(profile_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        with transaction.atomic():
+            user_serializer.save()
+            if profile_serializer is not None:
+                profile_serializer.save()
+
+        return Response(UserDataSerializer(user).data, status=status.HTTP_200_OK)
+
+    def patch(self, request):
+        return self.put(request)
     
 
 

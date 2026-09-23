@@ -1,5 +1,5 @@
 import axiosInstance from '@/lib/axios';
-import { RegisterFormData  , UserProfileFormData } from '../schemas/auth.schma';
+import { RegisterFormData  , ProfileFormData } from '../schemas/auth.schma';
 import {  UserChangePasswordRequest , UserChangePasswordResponse ,   ForgetPasswordResetRequest , ForgetPasswordResetResponse , RefreshAccessTokenResponse , RegisterVerifyOTP , RegisterResendOTP , LoginBody, GoogleLoginRequest , ForgetPasswordSendOTPResponse , ForgetPasswordVerifyOTPResponse , GoogleRegisterRequest, GoogleAuthResponse, UserProfile, GoogleSetPasswordVerifyOTPRequest, GoogleSetPasswordResetRequest } from "../types/auth.types";
 import { uploadImageToCloudinary } from '@/lib/cloudinary';
 // post(url , body , config)
@@ -31,7 +31,7 @@ async function userLogout(){
 }
 
 // the cookies will be sent [axiosInstance interceptores]
-async function updateUserProfile(requestBody : UserProfileFormData): Promise<UserProfile> {
+async function updateUserProfile(requestBody : ProfileFormData): Promise<UserProfile> {
     let profilePictureUrl: string | undefined;
     
     if (requestBody.profile_picture instanceof FileList && requestBody.profile_picture.length > 0) {

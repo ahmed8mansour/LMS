@@ -1,10 +1,7 @@
-import { ComingSoon } from "@/components/molecules/ComingSoon";
+import { redirect } from 'next/navigation'
 
+// /instructor/settings has no content of its own -- the sidebar links straight to
+// /profile, but a bookmark or a hand-typed URL must not land on a 404.
 export default function InstructorSettingsPage() {
-    return (
-        <ComingSoon
-            title="Settings"
-            description="Manage your account and public instructor profile. This is coming soon."
-        />
-    );
+    redirect('/instructor/settings/profile')
 }

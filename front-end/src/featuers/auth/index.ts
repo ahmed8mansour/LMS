@@ -6,6 +6,7 @@ export { GoogleRegisterButton } from "./components/GoogleRegisterButton";
 export {FPsendOTPForm} from "./components/froget-password/SendOTPForm"
 export {FPverifyOTPForm} from "./components/froget-password/verifyOTPForm";
 export {ResetPasswordForm} from "./components/froget-password/ResetPasswordForm";
+export { BackToSecurityLink } from "./components/froget-password/BackToSecurityLink";
 export { UserChangePassword } from "./components/dashboard/settings/UserChangePassword";
 export { PasswordManager } from "./components/dashboard/settings/UserPasswordManager";
 // Hooks

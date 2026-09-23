@@ -12,13 +12,24 @@ export async function uploadImageToCloudinary(file: File): Promise<string> {
     formData.append('timestamp', sigData.timestamp);
     formData.append('signature', sigData.signature);
 
-    const { data } = await axios.post(
-        `https://api.cloudinary.com/v1_1/${sigData.cloud_name}/image/upload`,
-        formData,
-        { timeout: 60000 }
-    );
-
-    return data.secure_url;
+    // Cloudinary is not our API, so its failures must not reach the mutation's
+    // error handler wearing an Axios response our code would misread (a 401 here
+    // is a signature problem, not a session problem). Re-throw as a plain Error
+    // so the reason shows verbatim and the rest of the form state is preserved.
+    try {
+        const { data } = await axios.post(
+            `https://api.cloudinary.com/v1_1/${sigData.cloud_name}/image/upload`,
+            formData,
+            { timeout: 60000 }
+        );
+        return data.secure_url;
+    } catch (e) {
+        const err = e as AxiosError<{ error?: { message?: string } }>;
+        const reason = err?.response?.data?.error?.message ?? '';
+        throw new Error(
+            `Couldn't upload your picture${reason ? `: ${reason}` : '. Please try again.'}`
+        );
+    }
 }
 
 /** 'transferring' = bytes still moving; 'finalizing' = all sent, waiting on Cloudinary + our confirm. */
