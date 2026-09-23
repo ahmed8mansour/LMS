@@ -8,7 +8,7 @@ import { MdOutlinePayments } from "react-icons/md";
 import { FaChevronRight } from "react-icons/fa";
 
 
-export default function settings({children}: {children: React.ReactNode}) {
+export default function SettingsLayout({children}: {children: React.ReactNode}) {
     const pathname = usePathname()
 
     return (
@@ -21,7 +21,7 @@ export default function settings({children}: {children: React.ReactNode}) {
                 <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
                 <aside className="w-full lg:w-64 lg:shrink-0">
                 <nav className="flex flex-col gap-1">
-                <Link className={`flex items-center justify-between px-4 py-3 ${pathname === '/dashboard/settings' || pathname === '/dashboard/settings/profile' ? 'bg-darkmint/10 text-darktext/80 font-bold' : 'text-darktext/60'} rounded-lg group`} href="/dashboard/settings/profile">
+                <Link className={`flex items-center justify-between px-4 py-3 ${pathname === '/dashboard/settings/profile' ? 'bg-darkmint/10 text-darktext/80 font-bold' : 'text-darktext/60'} rounded-lg group`} href="/dashboard/settings/profile">
                 <span className="flex items-center gap-3">
                 <GoPerson size={20} />
                                                 Profile

@@ -47,8 +47,8 @@ const MAX_FILE_SIZE = 2_000_000
 const ACCEPTED_TYPES = ['image/jpeg', 'image/png'] as const
 
 export const UserProfileSchema = z.object({
-    first_name: z.string().min(4, 'First name must be at least 4 characters'),
-    last_name: z.string().min(4, 'Last name must be at least 4 characters'),
+    first_name: z.string().trim().min(2, 'First name must be at least 2 characters').max(255),
+    last_name: z.string().trim().min(2, 'Last name must be at least 2 characters').max(255),
     email: z.string().email({ message: 'Invalid email address' }).optional(),
     date_joined: z.string().optional(),
     profile_picture: z
@@ -56,7 +56,7 @@ export const UserProfileSchema = z.object({
     .optional()
     .refine(
         (files) => !files || files.length === 0 || files[0].size <= MAX_FILE_SIZE,
-        'Max 10MB'
+        'Max 2MB'
     )
     .refine(
         (files) => !files || files.length === 0 || ACCEPTED_TYPES.includes(files[0].type as typeof ACCEPTED_TYPES[number]),
@@ -81,7 +81,18 @@ export const UserChangePasswordSchema = z.object({
 
 
 export type UserChangePasswordSchema = z.infer<typeof UserChangePasswordSchema>;
+// Instructors additionally maintain the public bio shown on their course pages.
+// Both fields are optional so an instructor can fix their name without being forced
+// to write a bio first; the backend mirrors this (blank=True, about capped at 1000).
+export const InstructorProfileSchema = UserProfileSchema.extend({
+    title: z.string().trim().max(255, 'Headline must be 255 characters or fewer').optional(),
+    about: z.string().trim().max(1000, 'Bio must be 1000 characters or fewer').optional(),
+});
+
 export type UserProfileFormData = z.infer<typeof UserProfileSchema>;
+export type InstructorProfileFormData = z.infer<typeof InstructorProfileSchema>;
+// The one shape the profile form and its mutation speak, whatever the caller's role.
+export type ProfileFormData = UserProfileFormData & Partial<Pick<InstructorProfileFormData, 'title' | 'about'>>;
 export type otpFormData = z.infer<typeof OTPSchema>;
 export type RegisterFormData = z.infer<typeof registerSchema>;
 export type LoginFormData = z.infer<typeof LoginSchema>;

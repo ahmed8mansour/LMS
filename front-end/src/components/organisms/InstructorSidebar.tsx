@@ -40,7 +40,7 @@ const navigationItems: NavigationItem[] = [
   { id: "analytics", name: "Analytics", icon: BarChart3, href: "/instructor/analytics" },
   { id: "reviews", name: "Reviews", icon: Star, href: "/instructor/reviews" },
   { id: "earnings", name: "Earnings", icon: DollarSign, href: "/instructor/earnings" },
-  { id: "settings", name: "Settings", icon: Settings, href: "/instructor/settings" },
+  { id: "settings", name: "Settings", icon: Settings, href: "/instructor/settings/profile" },
 ];
 
 export function InstructorSidebar({ className = "" }: InstructorSidebarProps) {
