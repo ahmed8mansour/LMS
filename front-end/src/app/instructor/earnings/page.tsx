@@ -1,10 +1,12 @@
-import { ComingSoon } from "@/components/molecules/ComingSoon";
+import { Suspense } from "react";
+import { EarningsSkeleton, InstructorEarnings } from "@/features/instructor-earnings";
 
+// The page reads ?period= through useSearchParams, which Next 16 requires to sit under a
+// Suspense boundary.
 export default function InstructorEarningsPage() {
     return (
-        <ComingSoon
-            title="Earnings"
-            description="Track your revenue and refunds across your courses. This is coming soon."
-        />
+        <Suspense fallback={<EarningsSkeleton />}>
+            <InstructorEarnings />
+        </Suspense>
     );
 }

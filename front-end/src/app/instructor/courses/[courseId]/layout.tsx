@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { CourseWorkspaceTabs, useInstructorCourse } from '@/featuers/instructor-courses';
+import { CourseWorkspaceTabs, useInstructorCourse } from '@/features/instructor-courses';
 
 // Per-course workspace shell: breadcrumb root + persistent tab bar around the child
 // route. A non-owned / missing course surfaces a clear not-found state (ownership

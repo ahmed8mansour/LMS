@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { Menu, X, ChevronLeft } from "lucide-react";
 import { useEffect } from "react";
-import { UserAvater } from "@/featuers/auth";
+import { UserAvater } from "@/features/auth";
 import { useUIStore } from "@/store/ui.store";
-import { LearnCourseTitle, LearnSideBar } from "@/featuers/progress";
+import { LearnCourseTitle, LearnSideBar } from "@/features/progress";
 
 function LayoutComponent({ children }: { children: React.ReactNode }) {
     const isSidebarOpen = useUIStore((state) => state.isLearnSideBarOpen);

@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { InstructorReviews, ReviewsSkeleton } from "@/featuers/instructor-reviews";
+import { InstructorReviews, ReviewsSkeleton } from "@/features/instructor-reviews";
 
 // The page reads ?rating= and ?page= through useSearchParams, which Next 16 requires to
 // sit under a Suspense boundary.

@@ -1,6 +1,6 @@
 import Filters from "@/components/molecules/Filters";
 import SearchAndSort from "@/components/molecules/SearchAndSort";
-import { CoursesCards } from "@/featuers/courses";
+import { CoursesCards } from "@/features/courses";
 export default function Courses() {
 
 

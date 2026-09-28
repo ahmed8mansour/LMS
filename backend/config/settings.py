@@ -171,6 +171,11 @@ REST_FRAMEWORK = {
         # runaway client loop, not a security boundary: ownership is the boundary,
         # enforced by the queryset.
         'instructor_reviews': '60/min',
+        # Earnings (spec 013) is driven by three period chips — one request per click,
+        # no search box, no paging — so 60 matches the dashboard, analytics and reviews
+        # rather than the roster's 120. A ceiling against a runaway client loop, not a
+        # security boundary: ownership is the boundary, enforced by the queryset.
+        'instructor_earnings': '60/min',
     },
 }
 

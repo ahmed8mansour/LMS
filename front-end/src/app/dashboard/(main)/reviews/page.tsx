@@ -1,5 +1,5 @@
-import { ReviewableCoursesCards } from "@/featuers/reviews/components/student/ReviewableCoursesCards";
-import { MyReviewsList } from "@/featuers/reviews/components/student/MyReviewsList";
+import { ReviewableCoursesCards } from "@/features/reviews/components/student/ReviewableCoursesCards";
+import { MyReviewsList } from "@/features/reviews/components/student/MyReviewsList";
 
 export default function ReviewsPage() {
     return (

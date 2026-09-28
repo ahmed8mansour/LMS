@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { FaArrowLeft } from "react-icons/fa";
-import { FPverifyOTPForm } from "@/featuers/auth";
+import { FPverifyOTPForm } from "@/features/auth";
 
 export default function GoogleSetPasswordVerify() {
     return (

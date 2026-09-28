@@ -6,7 +6,7 @@ import Image from "next/image";
 import { Avatar, AvatarFallback, AvatarImage } from "../atoms/avatar";
 import { IoMdStarOutline } from "react-icons/io";
 import { BookOpen, Play } from "lucide-react";
-import { CourseSummary } from "@/featuers/courses/types/course.types";
+import { CourseSummary } from "@/features/courses/types/course.types";
 
 interface CourseCardProps {
     course: CourseSummary;

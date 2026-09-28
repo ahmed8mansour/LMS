@@ -1,4 +1,4 @@
-import { PasswordManager } from '@/featuers/auth'
+import { PasswordManager } from '@/features/auth'
 
 export default function SecuritySettingsPage() {
   return (

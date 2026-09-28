@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { CourseForm, useCreateCourse, type CourseFormData } from '@/featuers/instructor-courses';
+import { CourseForm, useCreateCourse, type CourseFormData } from '@/features/instructor-courses';
 
 export default function NewCoursePage() {
     const createCourse = useCreateCourse();

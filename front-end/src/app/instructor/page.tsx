@@ -1,4 +1,4 @@
-import { InstructorDashboard } from "@/featuers/instructor-dashboard";
+import { InstructorDashboard } from "@/features/instructor-dashboard";
 
 export default function InstructorDashboardPage() {
     return <InstructorDashboard />;

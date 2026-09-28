@@ -8,7 +8,7 @@ import Link from "next/link";
 import { CiLock } from "react-icons/ci";
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { BsGithub } from "react-icons/bs"
-import { RegisterForm, GoogleLoginButton  , GoogleRegisterButton} from "@/featuers/auth"
+import { RegisterForm, GoogleLoginButton  , GoogleRegisterButton} from "@/features/auth"
 
 export default function Register() {
     return (

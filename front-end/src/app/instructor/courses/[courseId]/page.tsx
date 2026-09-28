@@ -2,7 +2,7 @@
 
 import { useParams } from 'next/navigation';
 import BounceLoader from '@/components/atoms/bouncing-loader';
-import { CourseOverview, useInstructorCourse } from '@/featuers/instructor-courses';
+import { CourseOverview, useInstructorCourse } from '@/features/instructor-courses';
 
 export default function CourseOverviewPage() {
     const params = useParams();

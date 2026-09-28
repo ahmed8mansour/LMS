@@ -1,4 +1,4 @@
-import { CourseDetailPage } from "@/featuers/courses";
+import { CourseDetailPage } from "@/features/courses";
 interface PageParams {
     id: string; 
 }

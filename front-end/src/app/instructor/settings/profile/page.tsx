@@ -1,5 +1,5 @@
 import { Info } from 'lucide-react'
-import { ProfileForm } from '@/featuers/progress'
+import { ProfileForm } from '@/features/progress'
 export default function InstructorProfilePage() {
   return (
     <div className="flex-1 bg-muted rounded-xl p-4 md:p-8 border border-border/30 shadow-sm">

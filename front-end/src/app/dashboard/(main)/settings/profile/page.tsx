@@ -1,5 +1,5 @@
 import { Info } from 'lucide-react'
-import { ProfileForm } from '@/featuers/progress'
+import { ProfileForm } from '@/features/progress'
 
 
 

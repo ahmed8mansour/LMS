@@ -12,7 +12,7 @@ import {
     InputOTPSlot,
 } from "@/components/atoms/input-otp"
 import { RefreshCwIcon } from "lucide-react"
-import { FPverifyOTPForm } from "@/featuers/auth";
+import { FPverifyOTPForm } from "@/features/auth";
 export default function page() {
     return (
                 <div className="login_component flex items-center justify-center h-full font-manrope">

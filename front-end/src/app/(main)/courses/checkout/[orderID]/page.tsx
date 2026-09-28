@@ -1,6 +1,6 @@
 "use client";
 
-import { CourseCheckout } from "@/featuers/enrollment";
+import { CourseCheckout } from "@/features/enrollment";
 
 export default function CheckoutPage() {
     return (

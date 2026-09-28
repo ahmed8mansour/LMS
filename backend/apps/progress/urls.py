@@ -1,9 +1,13 @@
 from django.urls import path
-from .views import  StudentDashboardOverviewView ,QuizEnrolledStudentView, SubmitQuizView , MarkLectureCompleteView ,EnrolledSectionDetialView ,StudentDashboardCourses , EnrolledCourseDetailView , EnrolledLectureDetailView
+from .views import  CourseCompletionView , StudentDashboardOverviewView ,QuizEnrolledStudentView, SubmitQuizView , MarkLectureCompleteView ,EnrolledSectionDetialView ,StudentDashboardCourses , EnrolledCourseDetailView , EnrolledLectureDetailView
 urlpatterns = [
     path('student/overview/' , StudentDashboardOverviewView.as_view(), name="student_overview"),
     path('student/courses/' , StudentDashboardCourses.as_view(), name="student_courses"),
     path('student/learn/course/<int:course_id>/' , EnrolledCourseDetailView.as_view(), name="enrolled_course_detail"),
+    # The end-of-course summary. A sibling of the course detail above, not a
+    # nested resource of it: it answers a different question from a different
+    # set of records (durations and quiz scores, not the section tree).
+    path('student/learn/course/<int:course_id>/completion/' , CourseCompletionView.as_view(), name="course_completion"),
     path('student/learn/section/<int:section_id>/' , EnrolledSectionDetialView.as_view(), name="enrolled_section_detail"),
     path('student/learn/lecture/<int:lecture_id>/' , EnrolledLectureDetailView.as_view(), name="get_lecture_detail"),
     path('student/learn/lecture/markcomplete/' ,MarkLectureCompleteView.as_view() , name="mark_lecture_complete" ),

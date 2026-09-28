@@ -1,7 +1,7 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import { QuizEditor } from '@/featuers/instructor-curriculum';
+import { QuizEditor } from '@/features/instructor-curriculum';
 
 export default function QuizEditorPage() {
     const params = useParams();

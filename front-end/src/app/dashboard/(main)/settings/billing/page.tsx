@@ -1,6 +1,6 @@
 'use client'
 
-import { BillingSummary, TransactionHistory } from '@/featuers/enrollment'
+import { BillingSummary, TransactionHistory } from '@/features/enrollment'
 import { CheckCircle } from "lucide-react";
 import { Button } from "@/components/atoms/button";
 

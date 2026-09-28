@@ -15,8 +15,8 @@ import { RiGraduationCapFill } from 'react-icons/ri';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import LogoWithText from '../molecules/LogoWithText';
-import { DashboardAvater } from '@/featuers/auth/components/dashboard/DashboardAvater';
-import { DashboardLogout } from '@/featuers/auth/components/dashboard/DashboardLogout';
+import { DashboardAvater } from '@/features/auth/components/dashboard/DashboardAvater';
+import { DashboardLogout } from '@/features/auth/components/dashboard/DashboardLogout';
 
 interface NavigationItem {
   id: string;

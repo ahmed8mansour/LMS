@@ -1,7 +1,7 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import { LectureEditor } from '@/featuers/instructor-curriculum';
+import { LectureEditor } from '@/features/instructor-curriculum';
 
 export default function LectureEditorPage() {
     const params = useParams();
