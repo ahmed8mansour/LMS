@@ -1,5 +1,5 @@
 import {create} from 'zustand'
-import { OrderDetails } from '@/featuers/enrollment/types/enrollment.types'
+import { OrderDetails } from '@/features/enrollment/types/enrollment.types'
 
 // The course attached to an order. `orderCourse` was imported here but never
 // existed in enrollment.types; this is the type the order payload actually uses.

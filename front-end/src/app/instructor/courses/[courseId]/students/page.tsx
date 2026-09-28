@@ -2,7 +2,7 @@
 
 import { Suspense } from "react";
 import { useParams } from "next/navigation";
-import { CourseStudents, RosterSkeleton } from "@/featuers/instructor-students";
+import { CourseStudents, RosterSkeleton } from "@/features/instructor-students";
 
 export default function CourseStudentsPage() {
     const params = useParams();

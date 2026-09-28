@@ -1,4 +1,4 @@
-import { FPsendOTPForm, BackToSecurityLink } from "@/featuers/auth";
+import { FPsendOTPForm, BackToSecurityLink } from "@/features/auth";
 
 export default function GoogleSetPassword() {
     return (

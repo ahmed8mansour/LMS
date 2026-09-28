@@ -169,6 +169,33 @@ class EnrolledCourseSerializer(serializers.Serializer):
 
 
 
+# ==================================================
+# url :
+# progress/student/learn/course/<id>/completion/
+
+class CompletionCourseSerializer(serializers.ModelSerializer):
+    """The little the completion screen needs about the course itself."""
+
+    class Meta:
+        model = Course
+        fields = ['id', 'title', 'thumbnail']
+
+
+class CourseCompletionSerializer(serializers.Serializer):
+    course             = CompletionCourseSerializer()
+    is_completed       = serializers.BooleanField()
+    lectures_completed = serializers.IntegerField()
+    total_lectures     = serializers.IntegerField()
+    quizzes_passed     = serializers.IntegerField()
+    total_quizzes      = serializers.IntegerField()
+    total_minutes      = serializers.IntegerField()
+    # null when the student has sat no quiz on this course — a course with no
+    # quizzes has no average, and 0% would read as a failure rather than a gap.
+    quiz_average       = serializers.FloatField(allow_null=True)
+    completed_at       = serializers.DateTimeField(allow_null=True)
+    has_reviewed       = serializers.BooleanField()
+
+
 # ─── Write Endpoint Serializers ─────────────────────────────
 
 class LectureCompleteResponseSerializer(serializers.Serializer):

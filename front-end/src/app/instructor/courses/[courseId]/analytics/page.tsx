@@ -2,7 +2,7 @@
 
 import { Suspense } from "react";
 import { useParams } from "next/navigation";
-import { AnalyticsSkeleton, CourseAnalytics } from "@/featuers/instructor-analytics";
+import { AnalyticsSkeleton, CourseAnalytics } from "@/features/instructor-analytics";
 
 export default function CourseAnalyticsPage() {
     const params = useParams();

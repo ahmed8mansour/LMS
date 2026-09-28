@@ -7,7 +7,7 @@ import { FiMenu, FiX } from "react-icons/fi";
 
 import LogoWithText from "../molecules/LogoWithText";
 import { Button } from "../atoms/button";
-import { UserAvater } from "@/featuers/auth";
+import { UserAvater } from "@/features/auth";
 
 const NAV_LINKS = [
   { label: "Explore", href: "/" },

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { FaArrowLeft } from "react-icons/fa";
-import { ResetPasswordForm } from "@/featuers/auth";
+import { ResetPasswordForm } from "@/features/auth";
 
 export default function GoogleSetPasswordReset() {
     return (

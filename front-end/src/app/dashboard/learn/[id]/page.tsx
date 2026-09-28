@@ -1,4 +1,4 @@
-import { CourseContent } from "@/featuers/progress";
+import { CourseContent } from "@/features/progress";
 
 interface CoursePageProps {
     params: Promise<{

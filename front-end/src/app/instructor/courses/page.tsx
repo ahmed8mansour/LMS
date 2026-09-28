@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { Plus } from 'lucide-react';
 import { Button } from '@/components/atoms/button';
-import { MyCoursesGrid } from '@/featuers/instructor-courses/components/MyCoursesGrid';
+import { MyCoursesGrid } from '@/features/instructor-courses/components/MyCoursesGrid';
 
 export default function InstructorCoursesPage() {
     return (

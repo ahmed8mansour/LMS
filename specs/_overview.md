@@ -156,6 +156,12 @@ Course
   - Pass/fail based on threshold
   - View correct answers after passing
   - Prevent retakes after passing
+- **Course Completion (spec 014)**: A read-only end-of-course summary — lectures completed, time spent
+  (summed lecture duration), and the quiz average (best attempt per quiz) — served by
+  `GET /progress/student/learn/course/<id>/completion/` (`apps/progress/completion/`). "Completed" means
+  every lecture done **and** every quiz passed; an unfinished student is redirected to the curriculum.
+  Reached from the last lecture, from the last quiz's result, and from a finished course's curriculum.
+  No schema change; no certificate.
 
 ### Frontend UI Components (Complete)
 
@@ -174,6 +180,9 @@ Course
 **Status**: Not implemented
 **Hint**: Course detail page mentions "Certificate of completion"
 **Missing**: Certificate generation and download functionality
+**Note (spec 014)**: The course-completion screen no longer claims one. It previously showed a
+"Certificate coming soon" badge; that badge now carries the date the course was completed. The course
+detail page's marketing claim is still outstanding.
 
 ### 2. Instructor Dashboard
 
@@ -288,6 +297,7 @@ sidebar Reviews page
 | `/student/learn/lecture/markcomplete/` | Mark lecture complete       |
 | `/student/learn/quiz/makeattempt/`     | Submit quiz answers         |
 | `/student/learn/quiz/<id>/`            | Get quiz questions          |
+| `/student/learn/course/<id>/completion/` | Course completion summary (spec 014) |
 
 ---
 

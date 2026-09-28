@@ -1,4 +1,4 @@
-import { DashboardPage } from "@/featuers/progress";
+import { DashboardPage } from "@/features/progress";
 
 export default function StudentDashboardPage() {
     return (

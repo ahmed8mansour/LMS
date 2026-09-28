@@ -2,7 +2,7 @@
 
 import { Suspense } from "react";
 import { useParams } from "next/navigation";
-import { CourseReviews, ReviewsSkeleton } from "@/featuers/instructor-reviews";
+import { CourseReviews, ReviewsSkeleton } from "@/features/instructor-reviews";
 
 export default function CourseReviewsPage() {
     const params = useParams();

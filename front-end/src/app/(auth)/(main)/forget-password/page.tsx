@@ -4,7 +4,7 @@ import { Button } from "@/components/atoms/button"
 import { PasswordInput } from "@/components/atoms/password-input"
 import { FaArrowRight , FaArrowLeft } from "react-icons/fa";
 import Link from "next/link";
-import { FPsendOTPForm } from "@/featuers/auth";
+import { FPsendOTPForm } from "@/features/auth";
 
 export default function ForgetPassword() {
     return (

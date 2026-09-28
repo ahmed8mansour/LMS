@@ -9,7 +9,7 @@ import Link from "next/link";
 import { CiLock } from "react-icons/ci";
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { BsGithub } from "react-icons/bs"
-import { LoginForm, GoogleLoginButton } from "@/featuers/auth"
+import { LoginForm, GoogleLoginButton } from "@/features/auth"
 
 export default function Login() {
     return (

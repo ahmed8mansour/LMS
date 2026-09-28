@@ -1,4 +1,4 @@
-import { QuizResult } from '@/featuers/progress/components/student/QuizResult';
+import { QuizResult } from '@/features/progress/components/student/QuizResult';
 
 interface QuizResultPageProps {
     params: Promise<{ id: string; quizId: string }>;

@@ -1,7 +1,7 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import { CurriculumBuilder } from '@/featuers/instructor-curriculum';
+import { CurriculumBuilder } from '@/features/instructor-curriculum';
 
 export default function CourseCurriculumPage() {
     const params = useParams();

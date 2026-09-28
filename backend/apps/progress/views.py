@@ -22,9 +22,11 @@ from .serializers import (
     CourseOverviewSerializer , EnrolledCourseSerializer ,
     LectureCompleteResponseSerializer , MarkLectureCompleteSerializer ,
     QuizSubmitSerializer , QuizSubmitResponseSerializer,
-    QuizDataSerializer , LectureProgressSerializer
+    QuizDataSerializer , LectureProgressSerializer ,
+    CourseCompletionSerializer
 )
 from .models import LectureProgress , QuizAttempt , QuizAttemptAnswer
+from .completion import build_course_completion
 from .utils import get_student_sorted_courses , is_section_unlocked , is_lecture_unlocked , is_quiz_unlocked , get_section_progress
 from rest_framework.generics import RetrieveAPIView
 
@@ -158,6 +160,39 @@ class EnrolledCourseDetailView(APIView):
         serializer = EnrolledCourseSerializer(data )
         return Response(serializer.data , status=status.HTTP_200_OK)
     
+
+class CourseCompletionView(APIView):
+    """
+    The completion summary for one enrolled course.
+
+    Always returns the summary, never an error, for a student who is enrolled —
+    `is_completed` tells the caller whether the completion screen should render
+    at all, so the page can send an unfinished student back to the curriculum
+    without having to parse an error message.
+    """
+
+    authentication_classes = [CookieJWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, course_id):
+        try:
+            user_profile = StudentProfile.objects.get(user=request.user)
+        except StudentProfile.DoesNotExist:
+            return Response({"error": "Student profile not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        enrollment = Enrollment.objects.filter(
+            user=request.user, is_active=True, course=course_id
+        ).select_related('course').first()
+
+        if not enrollment:
+            return Response(
+                {"error": "You are not enrolled in this course"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        data = build_course_completion(user_profile, enrollment.course)
+        return Response(CourseCompletionSerializer(data).data, status=status.HTTP_200_OK)
+
 
 class  EnrolledSectionDetialView(APIView):
     authentication_classes =[CookieJWTAuthentication]

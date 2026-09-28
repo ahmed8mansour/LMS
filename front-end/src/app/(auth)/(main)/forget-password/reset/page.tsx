@@ -4,7 +4,7 @@ import { Button } from "@/components/atoms/button"
 import { PasswordInput } from "@/components/atoms/password-input"
 import { FaArrowRight , FaArrowLeft } from "react-icons/fa";
 import Link from "next/link";
-import { ResetPasswordForm } from "@/featuers/auth";
+import { ResetPasswordForm } from "@/features/auth";
 export default function page() {
     return (
             <div className="reset_component flex items-center justify-center h-full">

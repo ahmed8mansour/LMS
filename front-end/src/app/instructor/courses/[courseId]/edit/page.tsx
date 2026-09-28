@@ -8,7 +8,7 @@ import {
     useInstructorCourse,
     useUpdateCourse,
     type CourseFormData,
-} from '@/featuers/instructor-courses';
+} from '@/features/instructor-courses';
 
 export default function EditCoursePage() {
     const params = useParams();

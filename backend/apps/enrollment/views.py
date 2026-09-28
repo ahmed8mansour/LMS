@@ -12,7 +12,10 @@ from .serializers import CreatePaymentSerializer, GetOrderDetailsSerializer, Ord
 
 from django.db.models import Sum
 from apps.course.models import Course
-from apps.course.permissions import isAdmin
+from apps.course.permissions import isAdmin, isInstructor
+from apps.authentication.models import InstructorProfile
+from .earnings.periods import InvalidPeriod, parse_period
+from .earnings.service import InstructorEarningsService
 from .models import Order, Enrollment
 from .pagination import BillingPageNumberPagination
 from .payments.exceptions import PaymentException, DuplicatePaymentError, WebhookVerificationError
@@ -312,3 +315,65 @@ class AdminRefundOrderView(APIView):
             'refund_amount': str(result.amount_refunded),
             'stripe_refund_id': result.reference,
         }, status=status.HTTP_200_OK)
+
+
+class InstructorEarningsView(APIView):
+    """The instructor earnings snapshot (spec 013).
+
+    One scope, one period, one payload: the three money tiles, the revenue trend and the
+    per-course breakdown, for every course the caller owns.
+
+    GET /enrollment/instructor/earnings/?period=month|year|all
+
+    An APIView, not an @action: the snapshot spans all of an instructor's courses, so
+    there is no single owning row for get_object() to scope. Ownership comes from the
+    session's profile.
+
+    **This view reads no id from the client.** Its only input is `?period=`, which is why
+    it has no ownership check on a client-supplied value, no 404 branch, and nothing to
+    probe with — the smallest access-control surface of any instructor read (research
+    P5b). Do not add a `?course=` parameter here without re-reading that section: the
+    per-course breakdown is a column in the payload, not a scope.
+    """
+
+    authentication_classes = [CookieJWTAuthentication]
+    permission_classes = [IsAuthenticated, isInstructor]
+    # `throttle_scope`, NOT `throttle_classes`: the latter wants a list of throttle
+    # CLASSES, and a string there makes DRF iterate the characters and try to call each
+    # one. 60/min matches the dashboard, analytics and reviews — three chips, one request
+    # per click. A ceiling against a runaway client loop, not a security boundary.
+    throttle_scope = 'instructor_earnings'
+
+    def get(self, request):
+        try:
+            profile = request.user.instructor_profile
+        except InstructorProfile.DoesNotExist:
+            # 403, not 401: the caller is authenticated. The additive `code` lets the
+            # client show a handled state instead of a retryable error (FR-034).
+            return Response(
+                {'error': 'No instructor profile is associated with this account.', 'code': 'no_instructor_profile'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        try:
+            period = parse_period(request.query_params.get('period'))
+        except InvalidPeriod:
+            # The API never guesses; the client is the one that falls back silently on a
+            # stale bookmark (FR-015c, research R8).
+            return Response(
+                {'error': 'period must be one of month, year, all.', 'code': 'invalid_period'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Build AND serialize inside one try: the snapshot is all-or-nothing, so a
+        # failure in any part of it returns a single error and never a page where the
+        # tiles loaded and the chart did not (FR-040).
+        try:
+            data = InstructorEarningsService().build(profile, period).to_dict()
+        except Exception:
+            logger.exception('Instructor earnings snapshot failed for profile %s', profile.id)
+            return Response(
+                {'error': "We couldn't load your earnings. Please try again."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+        return Response(data, status=status.HTTP_200_OK)
